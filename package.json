@@ -1,5 +1,5 @@
 {
-  "name": "server",
+  "name": "highfive_chess_backend",
   "description": "",
   "main": "index.js",
   "private": true,
