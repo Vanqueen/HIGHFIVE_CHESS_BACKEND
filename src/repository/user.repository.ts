@@ -15,7 +15,19 @@ export async function findUserByUsername(username: string) {
 }
 
 export async function findUsers(limit = 10) {
-  return db.orm.public.User.select("id", "email", "username", "createdAt")
+  return db.orm.public.User.select(
+    "id",
+    "email",
+    "username",
+    "avatarUrl",
+    "role",
+    "accountStatus",
+    "connectionStatus",
+    "lastLoginAt",
+    "createdAt",
+    "updatedAt",
+  )
+    .orderBy((user) => user.createdAt.desc())
     .limit(limit)
     .all();
 }
@@ -99,8 +111,26 @@ export async function recordLogin(id: number) {
   });
 }
 
-export async function recordFailedLogin(id: number, attempts: number) {
-  return db.orm.public.User.where({ id }).update({ failedLoginAttempts: attempts });
+export async function recordFailedLogin(id: number, maxAttempts: number, lockedUntil: Date) {
+  const plan = db.raw.sql`
+    UPDATE "public"."User"
+    SET
+      "failedLoginAttempts" = CASE
+        WHEN "lockedUntil" IS NOT NULL AND "lockedUntil" <= NOW() THEN 1
+        ELSE "failedLoginAttempts" + 1
+      END,
+      "lockedUntil" = CASE
+        WHEN CASE
+          WHEN "lockedUntil" IS NOT NULL AND "lockedUntil" <= NOW() THEN 1
+          ELSE "failedLoginAttempts" + 1
+        END >= ${maxAttempts}
+          THEN GREATEST(COALESCE("lockedUntil", NOW()), ${lockedUntil.toISOString()}::timestamptz)
+        WHEN "lockedUntil" IS NOT NULL AND "lockedUntil" <= NOW() THEN NULL
+        ELSE "lockedUntil"
+      END
+    WHERE "id" = ${id}
+  `.affectedCount().build();
+  return db.runtime().execute(plan);
 }
 
 export async function resetLoginAttempts(id: number) {
