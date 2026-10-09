@@ -7,6 +7,7 @@ export const generateToken = (
     type: "access" | "refresh",
     JWT_SECRET: string,
     JWT_EXPIRES_IN: number,
+    sessionId?: number,
   ) => {
   // type = access or refresh
   const payload = {
@@ -14,6 +15,7 @@ export const generateToken = (
     email: user.email,
     role: user.role,
     type: type,
+    ...(sessionId !== undefined ? { sessionId } : {}),
   };
   try {
     const token = jwt.sign(payload, JWT_SECRET, {
@@ -63,6 +65,16 @@ export const hashToken = async (token: string) => {
     return hashedPassword;
   } catch (error) {
     console.error("Erreur lors du hachage du token :", error);
+    throw error;
+  }
+};
+
+export const verifyTokenHash = async (tokenHash: string, token: string) => {
+  if (!tokenHash || !token) return false;
+  try {
+    return await argon2.verify(tokenHash, token);
+  } catch (error) {
+    console.error("Erreur lors de la vérification du hash du token :", error);
     throw error;
   }
 };

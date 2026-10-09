@@ -9,7 +9,7 @@
     "node": "^22.18.0 || >=24.11.0"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "build": "tsdown",
     "composer:deploy": "prisma deploy module.ts",
     "composer:dev": "prisma dev module.ts",
@@ -20,14 +20,14 @@
     "db:push": "prisma db push",
     "db:seed": "npx tsx --trace-warnings src/prisma/run-seed.ts",
     "deploy": "npm run build && npm run composer:deploy",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --trace-warnings src/index.ts",
     "dev:composer": "npm run build && npm run composer:dev",
     "migrate": "prisma db migrate",
     "migration:plan": "prisma migration plan",
     "migration:show": "prisma migration show",
     "migration:status": "prisma migration status",
     "start": "node dist/server.mjs",
-    "serve": "tsx watch src/index.ts"
+    "serve": "tsx watch --trace-warnings src/index.ts"
   },
   "dependencies": {
     "@prisma/composer": "0.24.0",
@@ -36,6 +36,7 @@
     "alchemy": "2.0.0-beta.78",
     "argon2": "^0.45.1",
     "bcryptjs": "^3.0.3",
+    "chess.js": "^1.4.0",
     "cloudinary": "^2.11.0",
     "compression": "^1.8.2",
     "cookie-parser": "^1.4.7",
@@ -63,7 +64,8 @@
     "ts-node": "^10.9.2",
     "tsdown": "^0.22.14",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
   },
   "overrides": {
     "effect": "4.0.0-rc.115",

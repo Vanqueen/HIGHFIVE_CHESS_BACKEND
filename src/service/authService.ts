@@ -10,12 +10,38 @@ import {
   createAuthenticatedSession,
   logoutAccount,
 } from "../repository/account.repository";
+import {
+  findActiveRefreshTokensByUser,
+  rotateRefreshToken,
+} from "../repository/refresh-token.repository";
 import { emailValidation } from "../utils/email";
 import { hashPassword, passwordValidation, verifyPassword } from "../utils/password";
-import { generateToken, hashToken } from "../utils/token";
+import { generateToken, hashToken, verifyTokenHash } from "../utils/token";
+import jwt, { type JwtPayload } from "jsonwebtoken";
 import HttpError, { rethrowServiceError } from "./errorService";
 
 export class AuthService {
+  private static tokenLifetimes() {
+    const accessTtlSeconds = Number(process.env.JWT_ACCESS_EXPIRES_IN ?? 900);
+    const refreshTtlSeconds = Number(process.env.JWT_REFRESH_EXPIRES_IN);
+    if (!Number.isFinite(accessTtlSeconds) || accessTtlSeconds <= 0) {
+      throw new Error("JWT_ACCESS_EXPIRES_IN must be a positive number");
+    }
+    if (!Number.isFinite(refreshTtlSeconds) || refreshTtlSeconds <= 0) {
+      throw new Error("JWT_REFRESH_EXPIRES_IN must be a positive number");
+    }
+    return { accessTtlSeconds, refreshTtlSeconds };
+  }
+
+  private static tokenSecrets() {
+    const accessSecret = process.env.JWT_ACCESS_SECRET;
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+    if (!accessSecret || !refreshSecret) {
+      throw new Error("JWT secrets are not configured");
+    }
+    return { accessSecret, refreshSecret };
+  }
+
   static sanitizeUser(user: NonNullable<Awaited<ReturnType<typeof findUser>>>) {
     return {
       id: user.id,
@@ -113,16 +139,8 @@ export class AuthService {
         throw new HttpError("Identifiants invalides.", 401, false);
       }
 
-      const refreshSecret = process.env.JWT_REFRESH_SECRET;
-      const accessSecret = process.env.JWT_ACCESS_SECRET;
-      if (!refreshSecret || !accessSecret) {
-        throw new Error("JWT secrets are not configured");
-      }
-
-      const refreshTtlSeconds = Number(process.env.JWT_REFRESH_EXPIRES_IN);
-      if (!Number.isFinite(refreshTtlSeconds) || refreshTtlSeconds <= 0) {
-        throw new Error("JWT_REFRESH_EXPIRES_IN must be a positive number");
-      }
+      const { accessSecret, refreshSecret } = AuthService.tokenSecrets();
+      const { accessTtlSeconds, refreshTtlSeconds } = AuthService.tokenLifetimes();
       const refreshExpiresAt = new Date(Date.now() + refreshTtlSeconds * 1000);
       const refreshToken = generateToken(
         user,
@@ -139,18 +157,112 @@ export class AuthService {
         refreshExpiresAt,
       );
 
-      if (!authenticatedUser) {
-        throw new Error("Utilisateur introuvable après authentification");
-      }
+      const accessExpiresAt = new Date(Date.now() + accessTtlSeconds * 1000);
+      const accessToken = generateToken(
+        authenticatedUser.user,
+        "access",
+        accessSecret,
+        accessTtlSeconds,
+        authenticatedUser.session.id,
+      );
       return {
         success: true,
+        accessToken: {
+          token: accessToken,
+          expiresAt: accessExpiresAt,
+        },
+        refreshToken: { 
+          token: refreshToken, 
+          expiresAt: refreshExpiresAt 
+        },
         user: {
-          ...AuthService.sanitizeUser(authenticatedUser),
-          refreshToken: { token: refreshToken, expiresAt: refreshExpiresAt },
+          ...AuthService.sanitizeUser(authenticatedUser.user),
         },
       };
     } catch (error) {
       rethrowServiceError(error, "Erreur lors de la connexion de l'utilisateur :");
+    }
+  }
+
+  static async refresh(refreshToken: string) {
+    try {
+      if (!refreshToken) {
+        throw new HttpError("Refresh token requis.", 401, false);
+      }
+      const { accessSecret, refreshSecret } = AuthService.tokenSecrets();
+      const { accessTtlSeconds, refreshTtlSeconds } = AuthService.tokenLifetimes();
+
+      let decoded: string | JwtPayload;
+      try {
+        decoded = jwt.verify(refreshToken, refreshSecret);
+      } catch {
+        throw new HttpError("Refresh token invalide ou expiré.", 401, false);
+      }
+      if (
+        typeof decoded === "string" ||
+        !Number.isSafeInteger(decoded.id) ||
+        typeof decoded.id !== "number" ||
+        decoded.id <= 0 ||
+        typeof decoded.email !== "string" ||
+        (decoded.role !== "USER" && decoded.role !== "ORGANIZER" && decoded.role !== "ADMIN") ||
+        decoded.type !== "refresh"
+      ) {
+        throw new HttpError("Refresh token invalide ou expiré.", 401, false);
+      }
+
+      const user = await findUser(decoded.id);
+      if (!user || user.email !== decoded.email || user.deletedAt !== null) {
+        throw new HttpError("Refresh token invalide ou expiré.", 401, false);
+      }
+      const activeTokens = await findActiveRefreshTokensByUser(user.id);
+      let storedToken: (typeof activeTokens)[number] | undefined;
+      for (const candidate of activeTokens) {
+        if (await verifyTokenHash(candidate.tokenHash, refreshToken)) {
+          storedToken = candidate;
+          break;
+        }
+      }
+      if (!storedToken) {
+        throw new HttpError("Refresh token invalide ou déjà utilisé.", 401, false);
+      }
+
+      const now = Date.now();
+      const newRefreshExpiresAt = new Date(now + refreshTtlSeconds * 1000);
+      const newRefreshToken = generateToken(
+        user,
+        "refresh",
+        refreshSecret,
+        refreshTtlSeconds,
+      );
+      const rotated = await rotateRefreshToken(
+        storedToken.id,
+        user.id,
+        storedToken.sessionId,
+        await hashToken(newRefreshToken),
+        newRefreshExpiresAt,
+      );
+      const newAccessToken = generateToken(
+        rotated.user,
+        "access",
+        accessSecret,
+        accessTtlSeconds,
+        rotated.session.id,
+      );
+
+      return {
+        success: true,
+        accessToken: {
+          token: newAccessToken,
+          expiresAt: new Date(now + accessTtlSeconds * 1000),
+        },
+        refreshToken: {
+          token: newRefreshToken,
+          expiresAt: newRefreshExpiresAt,
+        },
+        user: AuthService.sanitizeUser(rotated.user),
+      };
+    } catch (error) {
+      rethrowServiceError(error, "Erreur lors du renouvellement des tokens :");
     }
   }
 

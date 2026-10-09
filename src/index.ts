@@ -1,7 +1,12 @@
 import { createServer } from "node:http";
+import express from "express";
+import fileUpload from "express-fileupload";
 import { connectDatabase } from "./prisma/db.ts";
-import { listUsers } from "./prisma/users.ts";
-
+import authRouter from "./routes/auth";
+import gameRouter from "./routes/game";
+import usersRouter from "./routes/users";
+import { errorHandler } from "./middlewares/error.middleware";
+import { attachGameGateway } from "./websocket/game.gateway";
 
 const port = Number(process.env.PORT ?? 3000);
 
@@ -11,27 +16,27 @@ async function startServer() {
   try {
     await connectDatabase();
 
-    createServer(async (_request, response) => {
-      try {
-        const users = await listUsers();
+    const app = express();
+    app.disable("x-powered-by");
+    app.use(express.json({ limit: "1mb" }));
+    app.use(fileUpload({
+      limits: { fileSize: 5 * 1024 * 1024 },
+      abortOnLimit: true,
+      safeFileNames: true,
+      preserveExtension: true,
+    }));
 
-        response.writeHead(200, {
-          "content-type": "application/json",
-        });
+    app.get("/health", (_request, response) => {
+      response.status(200).json({ success: true });
+    });
+    app.use("/api/auth", authRouter);
+    app.use("/api/users", usersRouter);
+    app.use("/api/games", gameRouter);
+    app.use(errorHandler);
 
-        response.end(JSON.stringify({ users }));
-      } catch (error) {
-        console.error("Failed to query users:", error);
-
-        response.writeHead(500, {
-          "content-type": "application/json",
-        });
-
-        response.end(
-          JSON.stringify({ error: "Could not query users yet." }),
-        );
-      }
-    }).listen(port, "0.0.0.0", () => {
+    const httpServer = createServer(app);
+    attachGameGateway(httpServer);
+    httpServer.listen(port, "0.0.0.0", () => {
       console.log(`Server running at http://localhost:${port}`);
     });
   } catch (error) {
@@ -41,4 +46,3 @@ async function startServer() {
 }
 
 startServer();
-

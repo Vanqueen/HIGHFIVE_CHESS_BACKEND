@@ -9,6 +9,16 @@ export async function findGameParticipant(id: number) {
   return db.orm.public.GameParticipant.where({ id }).first();
 }
 
+export async function findGameParticipantsByGameId(gameId: number) {
+  return db.orm.public.GameParticipant.where({ gameId })
+    .orderBy((participant) => participant.color.asc())
+    .all();
+}
+
+export async function findGameParticipantsByUserId(userId: number, limit = 100) {
+  return db.orm.public.GameParticipant.where({ userId }).limit(limit).all();
+}
+
 export async function findGameParticipants(limit = 100) {
   return db.orm.public.GameParticipant.limit(limit).all();
 }

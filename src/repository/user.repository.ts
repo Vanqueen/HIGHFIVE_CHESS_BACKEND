@@ -27,6 +27,7 @@ export async function findUsers(limit = 10) {
     "createdAt",
     "updatedAt",
   )
+    .where({ deletedAt: null })
     .orderBy((user) => user.createdAt.desc())
     .limit(limit)
     .all();
@@ -94,12 +95,71 @@ export async function updateEmail(id: number, email: string) {
   return db.orm.public.User.where({ id }).update({ email });
 }
 
+export async function savePendingEmailChange(
+  id: number,
+  email: string,
+  codeHash: string,
+  expiresAt: Date,
+) {
+  return db.orm.public.User.where({ id }).update({
+    pendingEmail: email,
+    emailChangeCodeHash: codeHash,
+    emailChangeExpiresAt: expiresAt,
+  });
+}
+
+export async function completePendingEmailChange(
+  id: number,
+  email: string,
+  codeHash: string,
+  expiresAt: Date,
+) {
+  return db.transaction(async (tx) => {
+    const updated = await tx.orm.public.User
+      .where({
+        id,
+        deletedAt: null,
+        pendingEmail: email,
+        emailChangeCodeHash: codeHash,
+        emailChangeExpiresAt: expiresAt,
+      })
+      .update({
+        email,
+        pendingEmail: null,
+        emailChangeCodeHash: null,
+        emailChangeExpiresAt: null,
+        connectionStatus: "OFFLINE",
+      });
+
+    if (!updated) return false;
+
+    const now = new Date();
+    await tx.orm.public.Session.where({ userId: id, revokedAt: null })
+      .update({ revokedAt: now });
+    await tx.orm.public.RefreshToken.where({ userId: id, revokedAt: null })
+      .update({ revokedAt: now });
+    return true;
+  });
+}
+
+export async function clearPendingEmailChange(id: number, codeHash: string) {
+  return db.orm.public.User.where({ id, emailChangeCodeHash: codeHash }).update({
+    pendingEmail: null,
+    emailChangeCodeHash: null,
+    emailChangeExpiresAt: null,
+  });
+}
+
 export async function updateUsername(id: number, username: string) {
   return db.orm.public.User.where({ id }).update({ username });
 }
 
-export async function updateAvatar(id: number, avatarUrl: string | null) {
-  return db.orm.public.User.where({ id }).update({ avatarUrl });
+export async function updateAvatar(
+  id: number,
+  avatarUrl: string | null,
+  avatarPublicId: string | null,
+) {
+  return db.orm.public.User.where({ id }).update({ avatarUrl, avatarPublicId });
 }
 
 // ─── Login tracking ──────────────────────────────────────────────────────────

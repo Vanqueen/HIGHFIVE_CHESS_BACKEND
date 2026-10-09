@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'34a1bf1225376bd559928aa05f3a70a70142915251543c53f96b3aacbd85984a'>;
+  StorageHashBase<'ab5348b847e4004bbb52e4b52df9f7abf9ba17cbbd3749a75113ec17b5d09908'>;
 export type ExecutionHash =
   ExecutionHashBase<'d8c34a0b049a76c1f6f5a055b8d3ffcd114c2ca9483e661f21e49c9bf679b51b'>;
 export type ProfileHash =
@@ -289,6 +289,7 @@ export type FieldOutputTypes = {
     };
     readonly Conversation: {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly gameId: CodecTypes['pg/int4@1']['output'] | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly type: 'DIRECT' | 'GROUP' | 'TOURNAMENT' | 'GAME';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
@@ -325,6 +326,7 @@ export type FieldOutputTypes = {
       readonly isRated: CodecTypes['pg/bool@1']['output'];
       readonly lastActivityAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly lastMoveAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly pendingUndoParticipantId: CodecTypes['pg/int4@1']['output'] | null;
       readonly ratingCategory: 'BLITZ' | 'RAPID' | 'CLASSICAL' | null;
       readonly result: 'WHITE_WIN' | 'BLACK_WIN' | 'DRAW' | null;
       readonly startedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
@@ -399,6 +401,7 @@ export type FieldOutputTypes = {
     };
     readonly Move: {
       readonly fenAfter: CodecTypes['pg/text@1']['output'];
+      readonly fenBefore: CodecTypes['pg/text@1']['output'] | null;
       readonly from: CodecTypes['pg/text@1']['output'];
       readonly gameId: CodecTypes['pg/int4@1']['output'];
       readonly id: CodecTypes['pg/int4@1']['output'];
@@ -559,16 +562,20 @@ export type FieldOutputTypes = {
     };
     readonly User: {
       readonly accountStatus: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+      readonly avatarPublicId: CodecTypes['pg/text@1']['output'] | null;
       readonly avatarUrl: CodecTypes['pg/text@1']['output'] | null;
       readonly connectionStatus: 'ONLINE' | 'OFFLINE';
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly deletedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly email: CodecTypes['pg/text@1']['output'];
+      readonly emailChangeCodeHash: CodecTypes['pg/text@1']['output'] | null;
+      readonly emailChangeExpiresAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly failedLoginAttempts: CodecTypes['pg/int4@1']['output'];
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly lastLoginAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly lockedUntil: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly passwordHash: CodecTypes['pg/text@1']['output'];
+      readonly pendingEmail: CodecTypes['pg/text@1']['output'] | null;
       readonly role: 'USER' | 'ORGANIZER' | 'ADMIN';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly username: CodecTypes['pg/text@1']['output'];
@@ -625,6 +632,7 @@ export type FieldInputTypes = {
     };
     readonly Conversation: {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly gameId: CodecTypes['pg/int4@1']['input'] | null;
       readonly id: CodecTypes['pg/int4@1']['input'];
       readonly type: 'DIRECT' | 'GROUP' | 'TOURNAMENT' | 'GAME';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
@@ -661,6 +669,7 @@ export type FieldInputTypes = {
       readonly isRated: CodecTypes['pg/bool@1']['input'];
       readonly lastActivityAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly lastMoveAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly pendingUndoParticipantId: CodecTypes['pg/int4@1']['input'] | null;
       readonly ratingCategory: 'BLITZ' | 'RAPID' | 'CLASSICAL' | null;
       readonly result: 'WHITE_WIN' | 'BLACK_WIN' | 'DRAW' | null;
       readonly startedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
@@ -735,6 +744,7 @@ export type FieldInputTypes = {
     };
     readonly Move: {
       readonly fenAfter: CodecTypes['pg/text@1']['input'];
+      readonly fenBefore: CodecTypes['pg/text@1']['input'] | null;
       readonly from: CodecTypes['pg/text@1']['input'];
       readonly gameId: CodecTypes['pg/int4@1']['input'];
       readonly id: CodecTypes['pg/int4@1']['input'];
@@ -895,16 +905,20 @@ export type FieldInputTypes = {
     };
     readonly User: {
       readonly accountStatus: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+      readonly avatarPublicId: CodecTypes['pg/text@1']['input'] | null;
       readonly avatarUrl: CodecTypes['pg/text@1']['input'] | null;
       readonly connectionStatus: 'ONLINE' | 'OFFLINE';
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly deletedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly email: CodecTypes['pg/text@1']['input'];
+      readonly emailChangeCodeHash: CodecTypes['pg/text@1']['input'] | null;
+      readonly emailChangeExpiresAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly failedLoginAttempts: CodecTypes['pg/int4@1']['input'];
       readonly id: CodecTypes['pg/int4@1']['input'];
       readonly lastLoginAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly lockedUntil: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly passwordHash: CodecTypes['pg/text@1']['input'];
+      readonly pendingEmail: CodecTypes['pg/text@1']['input'] | null;
       readonly role: 'USER' | 'ORGANIZER' | 'ADMIN';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly username: CodecTypes['pg/text@1']['input'];
@@ -961,6 +975,7 @@ export type StorageColumnTypes = {
     };
     readonly Conversation: {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly gameId: CodecTypes['pg/int4@1']['output'] | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly type: 'DIRECT' | 'GROUP' | 'TOURNAMENT' | 'GAME';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
@@ -997,6 +1012,7 @@ export type StorageColumnTypes = {
       readonly isRated: CodecTypes['pg/bool@1']['output'];
       readonly lastActivityAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly lastMoveAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly pendingUndoParticipantId: CodecTypes['pg/int4@1']['output'] | null;
       readonly ratingCategory: 'BLITZ' | 'RAPID' | 'CLASSICAL' | null;
       readonly result: 'WHITE_WIN' | 'BLACK_WIN' | 'DRAW' | null;
       readonly startedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
@@ -1071,6 +1087,7 @@ export type StorageColumnTypes = {
     };
     readonly Move: {
       readonly fenAfter: CodecTypes['pg/text@1']['output'];
+      readonly fenBefore: CodecTypes['pg/text@1']['output'] | null;
       readonly from: CodecTypes['pg/text@1']['output'];
       readonly gameId: CodecTypes['pg/int4@1']['output'];
       readonly id: CodecTypes['pg/int4@1']['output'];
@@ -1231,16 +1248,20 @@ export type StorageColumnTypes = {
     };
     readonly User: {
       readonly accountStatus: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+      readonly avatarPublicId: CodecTypes['pg/text@1']['output'] | null;
       readonly avatarUrl: CodecTypes['pg/text@1']['output'] | null;
       readonly connectionStatus: 'ONLINE' | 'OFFLINE';
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly deletedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly email: CodecTypes['pg/text@1']['output'];
+      readonly emailChangeCodeHash: CodecTypes['pg/text@1']['output'] | null;
+      readonly emailChangeExpiresAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly failedLoginAttempts: CodecTypes['pg/int4@1']['output'];
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly lastLoginAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly lockedUntil: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly passwordHash: CodecTypes['pg/text@1']['output'];
+      readonly pendingEmail: CodecTypes['pg/text@1']['output'] | null;
       readonly role: 'USER' | 'ORGANIZER' | 'ADMIN';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly username: CodecTypes['pg/text@1']['output'];
@@ -1297,6 +1318,7 @@ export type StorageColumnInputTypes = {
     };
     readonly Conversation: {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly gameId: CodecTypes['pg/int4@1']['input'] | null;
       readonly id: CodecTypes['pg/int4@1']['input'];
       readonly type: 'DIRECT' | 'GROUP' | 'TOURNAMENT' | 'GAME';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
@@ -1333,6 +1355,7 @@ export type StorageColumnInputTypes = {
       readonly isRated: CodecTypes['pg/bool@1']['input'];
       readonly lastActivityAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly lastMoveAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly pendingUndoParticipantId: CodecTypes['pg/int4@1']['input'] | null;
       readonly ratingCategory: 'BLITZ' | 'RAPID' | 'CLASSICAL' | null;
       readonly result: 'WHITE_WIN' | 'BLACK_WIN' | 'DRAW' | null;
       readonly startedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
@@ -1407,6 +1430,7 @@ export type StorageColumnInputTypes = {
     };
     readonly Move: {
       readonly fenAfter: CodecTypes['pg/text@1']['input'];
+      readonly fenBefore: CodecTypes['pg/text@1']['input'] | null;
       readonly from: CodecTypes['pg/text@1']['input'];
       readonly gameId: CodecTypes['pg/int4@1']['input'];
       readonly id: CodecTypes['pg/int4@1']['input'];
@@ -1567,16 +1591,20 @@ export type StorageColumnInputTypes = {
     };
     readonly User: {
       readonly accountStatus: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+      readonly avatarPublicId: CodecTypes['pg/text@1']['input'] | null;
       readonly avatarUrl: CodecTypes['pg/text@1']['input'] | null;
       readonly connectionStatus: 'ONLINE' | 'OFFLINE';
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly deletedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly email: CodecTypes['pg/text@1']['input'];
+      readonly emailChangeCodeHash: CodecTypes['pg/text@1']['input'] | null;
+      readonly emailChangeExpiresAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly failedLoginAttempts: CodecTypes['pg/int4@1']['input'];
       readonly id: CodecTypes['pg/int4@1']['input'];
       readonly lastLoginAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly lockedUntil: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly passwordHash: CodecTypes['pg/text@1']['input'];
+      readonly pendingEmail: CodecTypes['pg/text@1']['input'] | null;
       readonly role: 'USER' | 'ORGANIZER' | 'ADMIN';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly username: CodecTypes['pg/text@1']['input'];
@@ -1643,12 +1671,14 @@ export namespace Models {
   };
   export type public_Conversation = {
     createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    gameId: CodecTypes['pg/int4@1']['output'] | null;
     id: CodecTypes['pg/int4@1']['output'];
     type: 'DIRECT' | 'GROUP' | 'TOURNAMENT' | 'GAME';
     updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    game: public_Game | null;
     messages: public_Message[];
     participants: public_ConversationParticipant[];
-    readonly [RelationKeys]?: 'messages' | 'participants';
+    readonly [RelationKeys]?: 'game' | 'messages' | 'participants';
   };
   export type public_ConversationParticipant = {
     conversationId: CodecTypes['pg/int4@1']['output'];
@@ -1688,6 +1718,7 @@ export namespace Models {
     isRated: CodecTypes['pg/bool@1']['output'];
     lastActivityAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     lastMoveAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+    pendingUndoParticipantId: CodecTypes['pg/int4@1']['output'] | null;
     ratingCategory: 'BLITZ' | 'RAPID' | 'CLASSICAL' | null;
     result: 'WHITE_WIN' | 'BLACK_WIN' | 'DRAW' | null;
     startedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
@@ -1711,18 +1742,22 @@ export namespace Models {
     whiteTimeRemainingMs: CodecTypes['pg/int8@1']['output'];
     analyses: public_GameAnalysis[];
     challenge: public_Challenge | null;
+    conversation: public_Conversation | null;
     drawOfferParticipant: public_GameParticipant | null;
     moves: public_Move[];
     participants: public_GameParticipant[];
+    pendingUndoParticipant: public_GameParticipant | null;
     ratingHistories: public_RatingHistory[];
     reports: public_Report[];
     tournamentRound: public_TournamentRound | null;
     readonly [RelationKeys]?:
       | 'analyses'
       | 'challenge'
+      | 'conversation'
       | 'drawOfferParticipant'
       | 'moves'
       | 'participants'
+      | 'pendingUndoParticipant'
       | 'ratingHistories'
       | 'reports'
       | 'tournamentRound';
@@ -1758,9 +1793,10 @@ export namespace Models {
     game: public_Game;
     moves: public_Move[];
     tournamentParticipant: public_TournamentParticipant | null;
+    undoRequestGames: public_Game[];
     user: public_User | null;
     readonly [RelationKeys]?:
-      'drawOfferGames' | 'game' | 'moves' | 'tournamentParticipant' | 'user';
+      'drawOfferGames' | 'game' | 'moves' | 'tournamentParticipant' | 'undoRequestGames' | 'user';
   };
   export type public_InvitationLink = {
     challengeId: CodecTypes['pg/int4@1']['output'] | null;
@@ -1797,6 +1833,7 @@ export namespace Models {
   };
   export type public_Move = {
     fenAfter: CodecTypes['pg/text@1']['output'];
+    fenBefore: CodecTypes['pg/text@1']['output'] | null;
     from: CodecTypes['pg/text@1']['output'];
     gameId: CodecTypes['pg/int4@1']['output'];
     id: CodecTypes['pg/int4@1']['output'];
@@ -1995,16 +2032,20 @@ export namespace Models {
   };
   export type public_User = {
     accountStatus: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+    avatarPublicId: CodecTypes['pg/text@1']['output'] | null;
     avatarUrl: CodecTypes['pg/text@1']['output'] | null;
     connectionStatus: 'ONLINE' | 'OFFLINE';
     createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     deletedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
     email: CodecTypes['pg/text@1']['output'];
+    emailChangeCodeHash: CodecTypes['pg/text@1']['output'] | null;
+    emailChangeExpiresAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
     failedLoginAttempts: CodecTypes['pg/int4@1']['output'];
     id: CodecTypes['pg/int4@1']['output'];
     lastLoginAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
     lockedUntil: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
     passwordHash: CodecTypes['pg/text@1']['output'];
+    pendingEmail: CodecTypes['pg/text@1']['output'] | null;
     role: 'USER' | 'ORGANIZER' | 'ADMIN';
     updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     username: CodecTypes['pg/text@1']['output'];
@@ -2378,6 +2419,11 @@ type ContractBase = Omit<
                   readonly nullable: false;
                   readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
                 };
+                readonly gameId: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
                 readonly id: {
                   readonly nativeType: 'int4';
                   readonly codecId: 'pg/int4@1';
@@ -2399,7 +2445,7 @@ type ContractBase = Omit<
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
+              uniques: readonly [{ readonly columns: readonly ['gameId'] }];
               indexes: readonly [
                 {
                   readonly name: 'Conversation_type_idx_b6b604ea';
@@ -2408,7 +2454,20 @@ type ContractBase = Omit<
                   readonly unique: false;
                 },
               ];
-              foreignKeys: readonly [];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Conversation';
+                    readonly columns: readonly ['gameId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Game';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
             };
             readonly ConversationParticipant: {
               columns: {
@@ -2673,6 +2732,11 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-temporal@1';
                   readonly nullable: true;
                 };
+                readonly pendingUndoParticipantId: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
                 readonly ratingCategory: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
@@ -2745,6 +2809,12 @@ type ContractBase = Omit<
                   readonly unique: false;
                 },
                 {
+                  readonly name: 'Game_pendingUndoParticipantId_idx_b4de87a4';
+                  readonly prefix: 'Game_pendingUndoParticipantId_idx';
+                  readonly columns: readonly ['pendingUndoParticipantId'];
+                  readonly unique: false;
+                },
+                {
                   readonly name: 'Game_status_idx_e98638ab';
                   readonly prefix: 'Game_status_idx';
                   readonly columns: readonly ['status'];
@@ -2769,6 +2839,18 @@ type ContractBase = Omit<
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'Game';
                     readonly columns: readonly ['drawOfferParticipantId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'GameParticipant';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Game';
+                    readonly columns: readonly ['pendingUndoParticipantId'];
                   };
                   readonly target: {
                     readonly namespaceId: 'public' & NamespaceId;
@@ -3271,6 +3353,11 @@ type ContractBase = Omit<
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
+                };
+                readonly fenBefore: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
                 };
                 readonly from: {
                   readonly nativeType: 'text';
@@ -4518,6 +4605,11 @@ type ContractBase = Omit<
                     readonly value: DefaultLiteralValue<'pg/text@1', 'ACTIVE'>;
                   };
                 };
+                readonly avatarPublicId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
                 readonly avatarUrl: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
@@ -4547,6 +4639,16 @@ type ContractBase = Omit<
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
+                };
+                readonly emailChangeCodeHash: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly emailChangeExpiresAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: true;
                 };
                 readonly failedLoginAttempts: {
                   readonly nativeType: 'int4';
@@ -4581,6 +4683,11 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
                 };
+                readonly pendingEmail: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
                 readonly role: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
@@ -4605,6 +4712,7 @@ type ContractBase = Omit<
               uniques: readonly [
                 { readonly columns: readonly ['username'] },
                 { readonly columns: readonly ['email'] },
+                { readonly columns: readonly ['pendingEmail'] },
               ];
               indexes: readonly [];
               foreignKeys: readonly [];
@@ -5212,6 +5320,10 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-temporal@1';
                 };
               };
+              readonly gameId: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
               readonly id: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
@@ -5229,6 +5341,15 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
+              readonly game: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Game' };
+                readonly cardinality: 'N:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['gameId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
               readonly messages: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -5257,6 +5378,7 @@ type ContractBase = Omit<
               readonly namespaceId: 'public';
               readonly fields: {
                 readonly createdAt: { readonly column: 'createdAt' };
+                readonly gameId: { readonly column: 'gameId' };
                 readonly id: { readonly column: 'id' };
                 readonly type: { readonly column: 'type' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
@@ -5482,6 +5604,10 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-temporal@1';
                 };
               };
+              readonly pendingUndoParticipantId: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
               readonly ratingCategory: {
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -5549,6 +5675,18 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['id'];
                 };
               };
+              readonly conversation: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Conversation';
+                };
+                readonly cardinality: '1:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['gameId'];
+                };
+              };
               readonly drawOfferParticipant: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -5578,6 +5716,18 @@ type ContractBase = Omit<
                 readonly on: {
                   readonly localFields: readonly ['id'];
                   readonly targetFields: readonly ['gameId'];
+                };
+              };
+              readonly pendingUndoParticipant: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'GameParticipant';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['pendingUndoParticipantId'];
+                  readonly targetFields: readonly ['id'];
                 };
               };
               readonly ratingHistories: {
@@ -5633,6 +5783,7 @@ type ContractBase = Omit<
                 readonly isRated: { readonly column: 'isRated' };
                 readonly lastActivityAt: { readonly column: 'lastActivityAt' };
                 readonly lastMoveAt: { readonly column: 'lastMoveAt' };
+                readonly pendingUndoParticipantId: { readonly column: 'pendingUndoParticipantId' };
                 readonly ratingCategory: { readonly column: 'ratingCategory' };
                 readonly result: { readonly column: 'result' };
                 readonly startedAt: { readonly column: 'startedAt' };
@@ -5821,6 +5972,14 @@ type ContractBase = Omit<
                 readonly on: {
                   readonly localFields: readonly ['tournamentParticipantId'];
                   readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly undoRequestGames: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Game' };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['pendingUndoParticipantId'];
                 };
               };
               readonly user: {
@@ -6073,6 +6232,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly fenBefore: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
               readonly from: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -6145,6 +6308,7 @@ type ContractBase = Omit<
               readonly namespaceId: 'public';
               readonly fields: {
                 readonly fenAfter: { readonly column: 'fenAfter' };
+                readonly fenBefore: { readonly column: 'fenBefore' };
                 readonly from: { readonly column: 'from' };
                 readonly gameId: { readonly column: 'gameId' };
                 readonly id: { readonly column: 'id' };
@@ -7150,6 +7314,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly avatarPublicId: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
               readonly avatarUrl: {
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -7176,6 +7344,17 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly emailChangeCodeHash: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly emailChangeExpiresAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
               readonly failedLoginAttempts: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
@@ -7200,6 +7379,10 @@ type ContractBase = Omit<
               };
               readonly passwordHash: {
                 readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly pendingEmail: {
+                readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly role: {
@@ -7456,16 +7639,20 @@ type ContractBase = Omit<
               readonly namespaceId: 'public';
               readonly fields: {
                 readonly accountStatus: { readonly column: 'accountStatus' };
+                readonly avatarPublicId: { readonly column: 'avatarPublicId' };
                 readonly avatarUrl: { readonly column: 'avatarUrl' };
                 readonly connectionStatus: { readonly column: 'connectionStatus' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly deletedAt: { readonly column: 'deletedAt' };
                 readonly email: { readonly column: 'email' };
+                readonly emailChangeCodeHash: { readonly column: 'emailChangeCodeHash' };
+                readonly emailChangeExpiresAt: { readonly column: 'emailChangeExpiresAt' };
                 readonly failedLoginAttempts: { readonly column: 'failedLoginAttempts' };
                 readonly id: { readonly column: 'id' };
                 readonly lastLoginAt: { readonly column: 'lastLoginAt' };
                 readonly lockedUntil: { readonly column: 'lockedUntil' };
                 readonly passwordHash: { readonly column: 'passwordHash' };
+                readonly pendingEmail: { readonly column: 'pendingEmail' };
                 readonly role: { readonly column: 'role' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
                 readonly username: { readonly column: 'username' };

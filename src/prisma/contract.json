@@ -1116,6 +1116,13 @@
                   "kind": "scalar"
                 }
               },
+              "gameId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -1145,6 +1152,22 @@
               }
             },
             "relations": {
+              "game": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "gameId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Game",
+                  "namespace": "public"
+                }
+              },
               "messages": {
                 "cardinality": "1:N",
                 "on": {
@@ -1180,6 +1203,9 @@
               "fields": {
                 "createdAt": {
                   "column": "createdAt"
+                },
+                "gameId": {
+                  "column": "gameId"
                 },
                 "id": {
                   "column": "id"
@@ -1525,6 +1551,13 @@
                   "kind": "scalar"
                 }
               },
+              "pendingUndoParticipantId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "ratingCategory": {
                 "nullable": true,
                 "type": {
@@ -1651,6 +1684,22 @@
                   "namespace": "public"
                 }
               },
+              "conversation": {
+                "cardinality": "1:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "gameId"
+                  ]
+                },
+                "to": {
+                  "model": "Conversation",
+                  "namespace": "public"
+                }
+              },
               "drawOfferParticipant": {
                 "cardinality": "N:1",
                 "nullable": true,
@@ -1690,6 +1739,22 @@
                   ],
                   "targetFields": [
                     "gameId"
+                  ]
+                },
+                "to": {
+                  "model": "GameParticipant",
+                  "namespace": "public"
+                }
+              },
+              "pendingUndoParticipant": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "pendingUndoParticipantId"
+                  ],
+                  "targetFields": [
+                    "id"
                   ]
                 },
                 "to": {
@@ -1787,6 +1852,9 @@
                 },
                 "lastMoveAt": {
                   "column": "lastMoveAt"
+                },
+                "pendingUndoParticipantId": {
+                  "column": "pendingUndoParticipantId"
                 },
                 "ratingCategory": {
                   "column": "ratingCategory"
@@ -2116,6 +2184,21 @@
                 },
                 "to": {
                   "model": "TournamentParticipant",
+                  "namespace": "public"
+                }
+              },
+              "undoRequestGames": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "pendingUndoParticipantId"
+                  ]
+                },
+                "to": {
+                  "model": "Game",
                   "namespace": "public"
                 }
               },
@@ -2531,6 +2614,13 @@
                   "kind": "scalar"
                 }
               },
+              "fenBefore": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "from": {
                 "nullable": false,
                 "type": {
@@ -2646,6 +2736,9 @@
               "fields": {
                 "fenAfter": {
                   "column": "fenAfter"
+                },
+                "fenBefore": {
+                  "column": "fenBefore"
                 },
                 "from": {
                   "column": "from"
@@ -4296,6 +4389,13 @@
                   "plane": "domain"
                 }
               },
+              "avatarPublicId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "avatarUrl": {
                 "nullable": true,
                 "type": {
@@ -4337,6 +4437,20 @@
                   "kind": "scalar"
                 }
               },
+              "emailChangeCodeHash": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "emailChangeExpiresAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
               "failedLoginAttempts": {
                 "nullable": false,
                 "type": {
@@ -4367,6 +4481,13 @@
               },
               "passwordHash": {
                 "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "pendingEmail": {
+                "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -4722,6 +4843,9 @@
                 "accountStatus": {
                   "column": "accountStatus"
                 },
+                "avatarPublicId": {
+                  "column": "avatarPublicId"
+                },
                 "avatarUrl": {
                   "column": "avatarUrl"
                 },
@@ -4737,6 +4861,12 @@
                 "email": {
                   "column": "email"
                 },
+                "emailChangeCodeHash": {
+                  "column": "emailChangeCodeHash"
+                },
+                "emailChangeExpiresAt": {
+                  "column": "emailChangeExpiresAt"
+                },
                 "failedLoginAttempts": {
                   "column": "failedLoginAttempts"
                 },
@@ -4751,6 +4881,9 @@
                 },
                 "passwordHash": {
                   "column": "passwordHash"
+                },
+                "pendingEmail": {
+                  "column": "pendingEmail"
                 },
                 "role": {
                   "column": "role"
@@ -5269,6 +5402,11 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "gameId": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/int4@1",
                   "default": {
@@ -5295,7 +5433,25 @@
                   "nullable": false
                 }
               },
-              "foreignKeys": [],
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "gameId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Conversation"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Game"
+                  }
+                }
+              ],
               "indexes": [
                 {
                   "columns": [
@@ -5311,7 +5467,13 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "gameId"
+                  ]
+                }
+              ]
             },
             "ConversationParticipant": {
               "columns": {
@@ -5691,6 +5853,11 @@
                   "nativeType": "timestamptz",
                   "nullable": true
                 },
+                "pendingUndoParticipantId": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
                 "ratingCategory": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -5793,6 +5960,23 @@
                   "onDelete": "setNull",
                   "source": {
                     "columns": [
+                      "pendingUndoParticipantId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Game"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "GameParticipant"
+                  }
+                },
+                {
+                  "onDelete": "setNull",
+                  "source": {
+                    "columns": [
                       "tournamentRoundId"
                     ],
                     "namespaceId": "public",
@@ -5847,6 +6031,14 @@
                   ],
                   "name": "Game_lastActivityAt_idx_49f89ccf",
                   "prefix": "Game_lastActivityAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "pendingUndoParticipantId"
+                  ],
+                  "name": "Game_pendingUndoParticipantId_idx_b4de87a4",
+                  "prefix": "Game_pendingUndoParticipantId_idx",
                   "unique": false
                 },
                 {
@@ -6531,6 +6723,11 @@
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
+                },
+                "fenBefore": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 },
                 "from": {
                   "codecId": "pg/text@1",
@@ -8229,6 +8426,11 @@
                     "plane": "storage"
                   }
                 },
+                "avatarPublicId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "avatarUrl": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -8268,6 +8470,16 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "emailChangeCodeHash": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "emailChangeExpiresAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "failedLoginAttempts": {
                   "codecId": "pg/int4@1",
                   "default": {
@@ -8300,6 +8512,11 @@
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
+                },
+                "pendingEmail": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 },
                 "role": {
                   "codecId": "pg/text@1",
@@ -8343,6 +8560,11 @@
                 {
                   "columns": [
                     "email"
+                  ]
+                },
+                {
+                  "columns": [
+                    "pendingEmail"
                   ]
                 }
               ]
@@ -8734,7 +8956,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "34a1bf1225376bd559928aa05f3a70a70142915251543c53f96b3aacbd85984a"
+    "storageHash": "ab5348b847e4004bbb52e4b52df9f7abf9ba17cbbd3749a75113ec17b5d09908"
   },
   "execution": {
     "executionHash": "d8c34a0b049a76c1f6f5a055b8d3ffcd114c2ca9483e661f21e49c9bf679b51b",

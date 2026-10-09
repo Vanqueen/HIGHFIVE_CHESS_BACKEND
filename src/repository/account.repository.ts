@@ -67,7 +67,11 @@ export async function createAuthenticatedSession(
       failedLoginAttempts: 0,
       lockedUntil: null,
     });
-    return tx.orm.public.User.where({ id: userId }).first();
+    const authenticatedUser = await tx.orm.public.User.where({ id: userId }).first();
+    if (!authenticatedUser) {
+      throw new AccountRepositoryError("Utilisateur non trouvé.", "not_found");
+    }
+    return { user: authenticatedUser, session };
   });
 }
 
@@ -108,14 +112,58 @@ export async function softDeleteAccount(userId: number) {
   return db.transaction(async (tx) => {
     const user = await tx.orm.public.User.where({ id: userId }).first();
     if (!user) throw new AccountRepositoryError("Utilisateur non trouvé.", "not_found");
+    if (user.deletedAt !== null) {
+      throw new AccountRepositoryError("Ce compte est déjà en attente de suppression.", "deleted");
+    }
 
     const now = new Date();
     await tx.orm.public.User.where({ id: userId }).update({
       deletedAt: now,
       connectionStatus: "OFFLINE",
+      pendingEmail: null,
+      emailChangeCodeHash: null,
+      emailChangeExpiresAt: null,
     });
     await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: now });
     await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: now });
+  });
+}
+
+export async function updateAccountRoleAndRevokeSessions(
+  userId: number,
+  role: "USER" | "ORGANIZER" | "ADMIN",
+) {
+  return db.transaction(async (tx) => {
+    const user = await tx.orm.public.User.where({ id: userId }).first();
+    if (!user || user.deletedAt !== null) return null;
+
+    const now = new Date();
+    await tx.orm.public.User.where({ id: userId }).update({
+      role,
+      connectionStatus: "OFFLINE",
+    });
+    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: now });
+    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: now });
+    return tx.orm.public.User.where({ id: userId }).first();
+  });
+}
+
+export async function restoreDeletedAccount(userId: number) {
+  return db.transaction(async (tx) => {
+    const user = await tx.orm.public.User.where({ id: userId }).first();
+    if (!user) throw new AccountRepositoryError("Utilisateur non trouvé.", "not_found");
+    if (user.deletedAt === null) {
+      throw new AccountRepositoryError("Ce compte n'est pas en attente de suppression.", "not_found");
+    }
+
+    const now = new Date();
+    await tx.orm.public.User.where({ id: userId }).update({
+      deletedAt: null,
+      connectionStatus: "OFFLINE",
+    });
+    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: now });
+    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: now });
+    return tx.orm.public.User.where({ id: userId }).first();
   });
 }
 

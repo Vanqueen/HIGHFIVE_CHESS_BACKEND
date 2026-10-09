@@ -1,0 +1,22 @@
+export const GAME_EVENTS = {
+  STATE: "game-state",
+  UPDATED: "game-updated",
+  TIMER_UPDATE: "timer-update",
+  OFFER_DRAW: "offer-draw",
+  RESPOND_DRAW: "respond-draw",
+  REQUEST_UNDO: "request-undo",
+  RESPOND_UNDO: "respond-undo",
+  RESIGN: "resign",
+} as const;
+
+export const GAME_ACTIONS = {
+  STARTED: "started",
+  DRAW_OFFERED: "draw-offered",
+  DRAW_ACCEPTED: "draw-accepted",
+  DRAW_DECLINED: "draw-declined",
+  UNDO_REQUESTED: "undo-requested",
+  UNDO_ACCEPTED: "undo-accepted",
+  UNDO_DECLINED: "undo-declined",
+  RESIGNED: "resigned",
+  TIMEOUT: "timeout",
+} as const;

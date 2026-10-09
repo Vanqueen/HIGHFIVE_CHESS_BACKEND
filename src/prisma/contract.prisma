@@ -203,8 +203,12 @@ model User {
   id                  Int              @id @default(autoincrement())
   username            String           @unique
   email               String           @unique
+  pendingEmail         String?          @unique
+  emailChangeCodeHash  String?
+  emailChangeExpiresAt DateTime?
   passwordHash        String
   avatarUrl           String?
+  avatarPublicId      String?
   role                Role             @default(USER)
   accountStatus       AccountStatus    @default(ACTIVE)
   connectionStatus    ConnectionStatus @default(OFFLINE)
@@ -359,6 +363,13 @@ model Game {
     references: [id],
     onDelete: SetNull
   )
+  pendingUndoParticipantId Int?
+  pendingUndoParticipant    GameParticipant? @relation(
+    "GameUndoRequest",
+    fields: [pendingUndoParticipantId],
+    references: [id],
+    onDelete: SetNull
+  )
 
   createdAt             DateTime         @default(now())
   updatedAt             temporal.updatedAt()
@@ -370,6 +381,7 @@ model Game {
   tournamentRound       TournamentRound? @relation(fields: [tournamentRoundId], references: [id], onDelete: SetNull)
   challenge             Challenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
   reports               Report[]
+  conversation          Conversation?
 
   @@index([status])
   @@index([type])
@@ -391,6 +403,7 @@ model GameParticipant {
 
   game                  Game @relation("GameParticipants", fields: [gameId], references: [id], onDelete: Cascade)
   drawOfferGames        Game[] @relation("GameDrawOffer")
+  undoRequestGames      Game[] @relation("GameUndoRequest")
   user                  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
   tournamentParticipant TournamentParticipant? @relation(fields: [tournamentParticipantId], references: [id], onDelete: SetNull)
   moves Move[]
@@ -411,6 +424,7 @@ model Move {
   from          String
   to            String
   promotion     PromotionPiece?
+  fenBefore     String?
   fenAfter      String
   playedAt      DateTime        @default(now())
 
@@ -574,9 +588,11 @@ model BlockedUser {
 model Conversation {
   id        Int              @id @default(autoincrement())
   type      ConversationType
+  gameId    Int?             @unique
   createdAt DateTime         @default(now())
   updatedAt temporal.updatedAt()
 
+  game         Game? @relation(fields: [gameId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
   messages Message[]
 
