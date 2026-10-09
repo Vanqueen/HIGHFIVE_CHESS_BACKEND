@@ -28,7 +28,6 @@ export async function createAuthenticatedSession(
   expiresAt: Date,
 ) {
   return db.transaction(async (tx) => {
-    await tx.orm.public.User.where({ id: userId }).update({ connectionStatus: "ONLINE" });
     const user = await tx.orm.public.User.where({ id: userId }).first();
     if (!user || user.deletedAt !== null) {
       throw new AccountRepositoryError("Identifiants invalides.", "deleted");

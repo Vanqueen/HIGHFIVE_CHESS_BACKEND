@@ -9,6 +9,8 @@ import { authenticateAccessToken } from "../middlewares/auth.middleware";
 import { GameService } from "../service/gameService";
 import { MoveService } from "../service/moveService";
 import { GameChatService } from "../service/gameChatService";
+import { UserPresenceService } from "../service/userPresenceService";
+import { SocketPresenceRegistry } from "./socket-presence.registry";
 
 interface ClientToServerEvents {
   [CONNECTION_EVENTS.JOIN_GAME]: (payload: { gameId: number }, acknowledge?: Acknowledge) => void;
@@ -157,6 +159,25 @@ export function attachGameGateway(httpServer: HttpServer) {
     },
   );
   const clockIntervals = new Map<number, NodeJS.Timeout>();
+  const userPresence = new SocketPresenceRegistry();
+  const presenceWrites = new Map<number, Promise<void>>();
+
+  const synchronizePresence = async (userId: number) => {
+    const previousWrite = presenceWrites.get(userId) ?? Promise.resolve();
+    const nextWrite = previousWrite.catch(() => undefined).then(async () => {
+      const hasConnections = userPresence.hasConnections(userId);
+      const updated = hasConnections
+        ? await UserPresenceService.setOnline(userId)
+        : await UserPresenceService.setOffline(userId);
+      if (hasConnections && !updated) {
+        throw new Error(`Impossible de marquer l'utilisateur ${userId} comme connecté.`);
+      }
+    });
+    presenceWrites.set(userId, nextWrite);
+    return nextWrite.finally(() => {
+      if (presenceWrites.get(userId) === nextWrite) presenceWrites.delete(userId);
+    });
+  };
 
   const stopClock = (gameId: number) => {
     const interval = clockIntervals.get(gameId);
@@ -236,6 +257,12 @@ export function attachGameGateway(httpServer: HttpServer) {
 
   io.on("connection", (socket) => {
     const userSocket = socket as GameSocket;
+    userPresence.add(userSocket.data.userId, userSocket.id);
+    void synchronizePresence(userSocket.data.userId).catch((error) => {
+      console.error("Erreur de mise à jour de présence WebSocket :", error);
+      if (userSocket.connected) userSocket.disconnect(true);
+    });
+
     const sessionCheck = setInterval(() => {
       void authenticateAccessToken(userSocket.data.accessToken).catch(() => {
         userSocket.disconnect(true);
@@ -497,6 +524,10 @@ export function attachGameGateway(httpServer: HttpServer) {
 
     userSocket.on(CONNECTION_EVENTS.DISCONNECTING, () => {
       clearInterval(sessionCheck);
+      userPresence.remove(userSocket.data.userId, userSocket.id);
+      void synchronizePresence(userSocket.data.userId).catch((error) => {
+        console.error("Erreur de mise à jour de présence WebSocket :", error);
+      });
       for (const room of userSocket.rooms) {
         const match = /^game:(\d+)$/.exec(room);
         if (!match) continue;

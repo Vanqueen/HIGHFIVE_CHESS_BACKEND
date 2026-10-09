@@ -5,4 +5,5 @@ export const CONNECTION_EVENTS = {
   PLAYER_LEFT: "player-left",
   GAME_ERROR: "game-error",
   DISCONNECTING: "disconnecting",
+  DISCONNECTED: "disconnect",
 } as const;

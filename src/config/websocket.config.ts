@@ -1,7 +1,10 @@
 import type { ServerOptions } from "socket.io";
+import { nodeEnv } from "./environment";
 
 export function getWebSocketConfig(env: NodeJS.ProcessEnv = process.env) {
-  const defaultOrigins = env.NODE_ENV === "production" ? "" : "http://localhost:5173";
+  const defaultOrigins = (env.NODE_ENV ?? nodeEnv) === "production"
+    ? ""
+    : "http://localhost:5173";
   const allowedOrigins = (env.CLIENT_ORIGINS ?? defaultOrigins)
     .split(",")
     .map((origin) => origin.trim())

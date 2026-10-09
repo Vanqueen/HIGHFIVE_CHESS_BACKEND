@@ -208,7 +208,15 @@ export async function unlockUser(id: number) {
 // ─── Connection ───────────────────────────────────────────────────────────────
 
 export async function setConnectionStatus(id: number, connectionStatus: "ONLINE" | "OFFLINE") {
-  return db.orm.public.User.where({ id }).update({ connectionStatus });
+  const updated = await db.orm.public.User
+    .where({
+      id,
+      ...(connectionStatus === "ONLINE"
+        ? { deletedAt: null, accountStatus: "ACTIVE" as const }
+        : {}),
+    })
+    .update({ connectionStatus });
+  return Boolean(updated);
 }
 
 // ─── Soft delete ─────────────────────────────────────────────────────────────

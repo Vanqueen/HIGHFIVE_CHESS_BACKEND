@@ -1,3 +1,4 @@
+import "./config/environment";
 import { createServer } from "node:http";
 import express from "express";
 import fileUpload from "express-fileupload";
