@@ -25,6 +25,23 @@ export async function createPasswordResetCode(userId: number, codeHash: string, 
   });
 }
 
+export async function replaceActivePasswordResetCode(
+  userId: number,
+  codeHash: string,
+  expiresAt: Date,
+) {
+  return db.transaction(async (tx) => {
+    await tx.orm.public.PasswordResetCode.where({ userId, usedAt: null })
+      .update({ usedAt: new Date() });
+    return tx.orm.public.PasswordResetCode.create({
+      userId,
+      codeHash,
+      expiresAt,
+      createdAt: new Date(),
+    });
+  });
+}
+
 // ─── Invalidate ───────────────────────────────────────────────────────────────
 
 export async function invalidatePasswordResetCode(id: number) {
