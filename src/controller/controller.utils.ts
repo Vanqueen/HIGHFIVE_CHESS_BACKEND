@@ -55,6 +55,17 @@ export function readString(body: Record<string, unknown>, name: string): string 
   return value;
 }
 
+export function serializeBigInts(value: unknown): unknown {
+  if (typeof value === "bigint") return value.toString();
+  if (Array.isArray(value)) return value.map(serializeBigInts);
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nested]) => [key, serializeBigInts(nested)]),
+    );
+  }
+  return value;
+}
+
 export function readPositiveInteger(body: Record<string, unknown>, name: string): number {
   const value = body[name];
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {

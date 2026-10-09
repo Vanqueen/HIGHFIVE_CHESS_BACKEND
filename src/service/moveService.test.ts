@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   appendMove: vi.fn(),
+  backfillMoveFenBefore: vi.fn(),
   finishGameOnTimeout: vi.fn(),
+  findMoveByGameAndPly: vi.fn(),
   findGame: vi.fn(),
   findGameParticipantsByGameId: vi.fn(),
+  findMovesMissingFenBefore: vi.fn(),
   findMovesByGameId: vi.fn(),
 }));
 
@@ -18,6 +21,9 @@ vi.mock("../repository/game-participant.repository", () => ({
 
 vi.mock("../repository/move.repository", () => ({
   appendMove: mocks.appendMove,
+  backfillMoveFenBefore: mocks.backfillMoveFenBefore,
+  findMoveByGameAndPly: mocks.findMoveByGameAndPly,
+  findMovesMissingFenBefore: mocks.findMovesMissingFenBefore,
   findMovesByGameId: mocks.findMovesByGameId,
 }));
 
@@ -146,5 +152,55 @@ describe("MoveService.playMove", () => {
 
     expect(mocks.finishGameOnTimeout).toHaveBeenCalledOnce();
     expect(mocks.appendMove).not.toHaveBeenCalled();
+  });
+});
+
+describe("MoveService.backfillMissingFenBefore", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.backfillMoveFenBefore.mockResolvedValue(true);
+  });
+
+  it("uses the prior ply's resulting position for later moves", async () => {
+    const previousFen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+    mocks.findMovesMissingFenBefore.mockResolvedValue([
+      { id: 12, gameId: 41, ply: 2, from: "e7", to: "e5", promotion: null, fenAfter: "result" },
+    ]);
+    mocks.findMoveByGameAndPly.mockResolvedValue({ fenAfter: previousFen });
+
+    await expect(MoveService.backfillMissingFenBefore()).resolves.toEqual({
+      scanned: 1,
+      updated: 1,
+      unresolved: 0,
+    });
+    expect(mocks.backfillMoveFenBefore).toHaveBeenCalledWith(12, previousFen);
+  });
+
+  it("fills a standard opening move only when replay matches the stored result", async () => {
+    const standardE4Fen =
+      "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+    mocks.findMovesMissingFenBefore.mockResolvedValue([
+      { id: 13, gameId: 41, ply: 1, from: "e2", to: "e4", promotion: null, fenAfter: standardE4Fen },
+    ]);
+
+    await expect(MoveService.backfillMissingFenBefore()).resolves.toEqual({
+      scanned: 1,
+      updated: 1,
+      unresolved: 0,
+    });
+    expect(mocks.backfillMoveFenBefore).toHaveBeenCalledWith(13, START_FEN);
+  });
+
+  it("leaves a first move from a non-standard starting position unresolved", async () => {
+    mocks.findMovesMissingFenBefore.mockResolvedValue([
+      { id: 14, gameId: 41, ply: 1, from: "e2", to: "e4", promotion: null, fenAfter: "custom-position" },
+    ]);
+
+    await expect(MoveService.backfillMissingFenBefore()).resolves.toEqual({
+      scanned: 1,
+      updated: 0,
+      unresolved: 1,
+    });
+    expect(mocks.backfillMoveFenBefore).not.toHaveBeenCalled();
   });
 });

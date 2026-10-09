@@ -3,6 +3,9 @@ import { findGame } from "../repository/game.repository";
 import { findGameParticipantsByGameId } from "../repository/game-participant.repository";
 import {
   appendMove,
+  backfillMoveFenBefore,
+  findMoveByGameAndPly,
+  findMovesMissingFenBefore,
   findMovesByGameId,
 } from "../repository/move.repository";
 import { finishGameOnTimeout } from "../repository/game-action.repository";
@@ -17,7 +20,47 @@ const promotionSymbols: Record<Promotion, "q" | "r" | "b" | "n"> = {
   KNIGHT: "n",
 };
 
+const STANDARD_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
 export class MoveService {
+  static async backfillMissingFenBefore() {
+    try {
+      const missingPositions = await findMovesMissingFenBefore();
+      let updated = 0;
+      let unresolved = 0;
+
+      for (const move of missingPositions) {
+        let fenBefore: string | null = null;
+        if (move.ply > 1) {
+          const previousMove = await findMoveByGameAndPly(move.gameId, move.ply - 1);
+          fenBefore = previousMove?.fenAfter ?? null;
+        } else if (move.ply === 1) {
+          const chess = new Chess(STANDARD_START_FEN);
+          try {
+            chess.move({
+              from: move.from,
+              to: move.to,
+              ...(move.promotion ? { promotion: promotionSymbols[move.promotion] } : {}),
+            });
+            if (chess.fen() === move.fenAfter) fenBefore = STANDARD_START_FEN;
+          } catch {
+            fenBefore = null;
+          }
+        }
+
+        if (fenBefore && await backfillMoveFenBefore(move.id, fenBefore)) {
+          updated += 1;
+        } else {
+          unresolved += 1;
+        }
+      }
+
+      return { scanned: missingPositions.length, updated, unresolved };
+    } catch (error) {
+      rethrowServiceError(error, "Erreur lors de la récupération des positions précédentes :");
+    }
+  }
+
   static async playMove(
     gameId: number,
     userId: number,

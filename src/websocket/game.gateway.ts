@@ -4,6 +4,7 @@ import { getWebSocketConfig } from "../config/websocket.config";
 import { CONNECTION_EVENTS } from "../events/connection.events";
 import { GAME_ACTIONS, GAME_EVENTS } from "../events/game.events";
 import { GAME_CHAT_EVENTS } from "../events/gameChat.events";
+import { subscribeToGameBroadcasts } from "../events/game.broadcast";
 import { MOVE_EVENTS } from "../events/move.events";
 import { authenticateAccessToken } from "../middlewares/auth.middleware";
 import { GameService } from "../service/gameService";
@@ -158,6 +159,25 @@ export function attachGameGateway(httpServer: HttpServer) {
       maxHttpBufferSize: config.maxHttpBufferSize,
     },
   );
+  const unsubscribeBroadcasts = subscribeToGameBroadcasts((event) => {
+    const room = `game:${event.gameId}`;
+    if (event.type === "updated") {
+      io.to(room).emit(GAME_EVENTS.UPDATED, {
+        action: event.action,
+        result: serializePayload(event.result),
+      });
+    } else if (event.type === "move-played") {
+      io.to(room).emit(MOVE_EVENTS.PLAYED, serializePayload(event.result) as {
+        game: SerializedGame;
+        move: PersistedMove;
+      });
+    } else {
+      io.to(room).emit(GAME_CHAT_EVENTS.MESSAGE, serializePayload(event.message) as
+        Awaited<ReturnType<typeof GameChatService.sendMessage>>);
+    }
+  });
+  io.once("close", unsubscribeBroadcasts);
+  console.info("[websocket] Serveur Socket.IO initialisé.");
   const clockIntervals = new Map<number, NodeJS.Timeout>();
   const userPresence = new SocketPresenceRegistry();
   const presenceWrites = new Map<number, Promise<void>>();

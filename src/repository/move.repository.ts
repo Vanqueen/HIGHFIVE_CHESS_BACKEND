@@ -15,6 +15,14 @@ export async function findMovesByGameId(gameId: number) {
   return db.orm.public.Move.where({ gameId }).orderBy((move) => move.ply.asc()).all();
 }
 
+export async function findMovesMissingFenBefore() {
+  return db.orm.public.Move.where({ fenBefore: null }).all();
+}
+
+export async function findMoveByGameAndPly(gameId: number, ply: number) {
+  return db.orm.public.Move.where({ gameId, ply }).first();
+}
+
 export async function createMove(data: CreateMoveData) {
   return db.orm.public.Move.create(data);
 }
@@ -57,6 +65,10 @@ export async function appendMove(
 
 export async function updateMove(id: number, updates: UpdateMoveData) {
   return db.orm.public.Move.where({ id }).update(updates);
+}
+
+export async function backfillMoveFenBefore(id: number, fenBefore: string) {
+  return db.orm.public.Move.where({ id, fenBefore: null }).update({ fenBefore });
 }
 
 export async function deleteMove(id: number) {
