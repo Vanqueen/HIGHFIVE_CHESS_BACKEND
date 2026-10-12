@@ -608,6 +608,10 @@
               {
                 "name": "CANCELLED",
                 "value": "CANCELLED"
+              },
+              {
+                "name": "NO_SHOW",
+                "value": "NO_SHOW"
               }
             ]
           },
@@ -5746,8 +5750,8 @@
                   "prefix": "Game_status_check"
                 },
                 {
-                  "expression": "\"terminationReason\" IN ('CHECKMATE', 'TIMEOUT', 'RESIGNATION', 'ABANDONMENT', 'DISCONNECTION', 'AGREEMENT', 'STALEMATE', 'THREEFOLD_REPETITION', 'FIFTY_MOVE_RULE', 'INSUFFICIENT_MATERIAL', 'CANCELLED')",
-                  "name": "Game_terminationReason_check_47aab425",
+                  "expression": "\"terminationReason\" IN ('CHECKMATE', 'TIMEOUT', 'RESIGNATION', 'ABANDONMENT', 'DISCONNECTION', 'AGREEMENT', 'STALEMATE', 'THREEFOLD_REPETITION', 'FIFTY_MOVE_RULE', 'INSUFFICIENT_MATERIAL', 'CANCELLED', 'NO_SHOW')",
+                  "name": "Game_terminationReason_check_813b6864",
                   "prefix": "Game_terminationReason_check"
                 },
                 {
@@ -8903,7 +8907,8 @@
                 "THREEFOLD_REPETITION",
                 "FIFTY_MOVE_RULE",
                 "INSUFFICIENT_MATERIAL",
-                "CANCELLED"
+                "CANCELLED",
+                "NO_SHOW"
               ]
             },
             "TournamentFormat": {
@@ -8956,7 +8961,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "ab5348b847e4004bbb52e4b52df9f7abf9ba17cbbd3749a75113ec17b5d09908"
+    "storageHash": "b7818c5d354030fc918c504f733cce7cbc969eaf233af50a374c0f84dec04d12"
   },
   "execution": {
     "executionHash": "d8c34a0b049a76c1f6f5a055b8d3ffcd114c2ca9483e661f21e49c9bf679b51b",

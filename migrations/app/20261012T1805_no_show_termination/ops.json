@@ -1,0 +1,86 @@
+[
+  {
+    "id": "dropCheckConstraint.Game.Game_terminationReason_check_47aab425",
+    "label": "Drop check constraint \"Game_terminationReason_check_47aab425\" on \"Game\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "Game_terminationReason_check_47aab425",
+        "table": "Game"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Game_terminationReason_check_47aab425\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Game_terminationReason_check_47aab425",
+          "public",
+          "\"public\".\"Game\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"Game_terminationReason_check_47aab425\"",
+        "sql": "ALTER TABLE \"public\".\"Game\" DROP CONSTRAINT \"Game_terminationReason_check_47aab425\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"Game_terminationReason_check_47aab425\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Game_terminationReason_check_47aab425",
+          "public",
+          "\"public\".\"Game\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.Game.Game_terminationReason_check_813b6864",
+    "label": "Add check constraint \"Game_terminationReason_check_813b6864\" on \"Game\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "Game_terminationReason_check_813b6864",
+        "table": "Game"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Game_terminationReason_check_813b6864\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Game_terminationReason_check_813b6864",
+          "public",
+          "\"public\".\"Game\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"Game_terminationReason_check_813b6864\"",
+        "sql": "ALTER TABLE \"public\".\"Game\" ADD CONSTRAINT \"Game_terminationReason_check_813b6864\" CHECK (\"terminationReason\" IN ('CHECKMATE', 'TIMEOUT', 'RESIGNATION', 'ABANDONMENT', 'DISCONNECTION', 'AGREEMENT', 'STALEMATE', 'THREEFOLD_REPETITION', 'FIFTY_MOVE_RULE', 'INSUFFICIENT_MATERIAL', 'CANCELLED', 'NO_SHOW'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"Game_terminationReason_check_813b6864\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Game_terminationReason_check_813b6864",
+          "public",
+          "\"public\".\"Game\""
+        ]
+      }
+    ]
+  }
+]

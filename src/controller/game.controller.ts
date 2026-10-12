@@ -219,6 +219,82 @@ export const GameController = {
     response.status(201).json(message);
   }) satisfies RequestHandler,
 
+  offerDrawAsGuest: (async (request, response) => {
+    const gameId = readParamId(request, "gameId");
+    const participantId = await requireGuestParticipantId(request.headers.authorization, gameId);
+    const result = serializeBigInts(await GameService.offerDrawAsParticipant(gameId, participantId));
+    publishGameBroadcast({ type: "updated", gameId, action: GAME_ACTIONS.DRAW_OFFERED, result });
+    response.status(200).json(result);
+  }) satisfies RequestHandler,
+
+  respondToDrawAsGuest: (async (request, response) => {
+    const gameId = readParamId(request, "gameId");
+    const participantId = await requireGuestParticipantId(request.headers.authorization, gameId);
+    const body = readBody(request);
+    if (typeof body.accept !== "boolean") {
+      response.status(422).json({ success: false, message: "Le champ accept doit être booléen." });
+      return;
+    }
+    const action = body.accept ? GAME_ACTIONS.DRAW_ACCEPTED : GAME_ACTIONS.DRAW_DECLINED;
+    const result = serializeBigInts(
+      await GameService.respondToDrawAsParticipant(gameId, participantId, body.accept),
+    );
+    publishGameBroadcast({ type: "updated", gameId, action, result });
+    response.status(200).json(result);
+  }) satisfies RequestHandler,
+
+  requestUndoAsGuest: (async (request, response) => {
+    const gameId = readParamId(request, "gameId");
+    const participantId = await requireGuestParticipantId(request.headers.authorization, gameId);
+    const result = serializeBigInts(await GameService.requestUndoAsParticipant(gameId, participantId));
+    publishGameBroadcast({ type: "updated", gameId, action: GAME_ACTIONS.UNDO_REQUESTED, result });
+    response.status(200).json(result);
+  }) satisfies RequestHandler,
+
+  respondToUndoAsGuest: (async (request, response) => {
+    const gameId = readParamId(request, "gameId");
+    const participantId = await requireGuestParticipantId(request.headers.authorization, gameId);
+    const body = readBody(request);
+    if (typeof body.accept !== "boolean") {
+      response.status(422).json({ success: false, message: "Le champ accept doit être booléen." });
+      return;
+    }
+    const action = body.accept ? GAME_ACTIONS.UNDO_ACCEPTED : GAME_ACTIONS.UNDO_DECLINED;
+    const result = serializeBigInts(
+      await GameService.respondToUndoAsParticipant(gameId, participantId, body.accept),
+    );
+    publishGameBroadcast({ type: "updated", gameId, action, result });
+    response.status(200).json(result);
+  }) satisfies RequestHandler,
+
+  resignAsGuest: (async (request, response) => {
+    const gameId = readParamId(request, "gameId");
+    const participantId = await requireGuestParticipantId(request.headers.authorization, gameId);
+    const result = serializeBigInts(await GameService.resignAsParticipant(gameId, participantId));
+    publishGameBroadcast({ type: "updated", gameId, action: GAME_ACTIONS.RESIGNED, result });
+    response.status(200).json(result);
+  }) satisfies RequestHandler,
+
+  claimNoShowAsGuest: (async (request, response) => {
+    const gameId = readParamId(request, "gameId");
+    const participantId = await requireGuestParticipantId(request.headers.authorization, gameId);
+    const body = readBody(request);
+    if (body.outcome !== "DRAW" && body.outcome !== "CANCEL" && body.outcome !== "WIN") {
+      response.status(422).json({ success: false, message: "Résolution d'absence invalide." });
+      return;
+    }
+    const action = body.outcome === "DRAW"
+      ? GAME_ACTIONS.NO_SHOW_DRAW
+      : body.outcome === "WIN"
+        ? GAME_ACTIONS.NO_SHOW_WIN
+        : GAME_ACTIONS.NO_SHOW_CANCELLED;
+    const result = serializeBigInts(
+      await GameService.claimNoShowAsParticipant(gameId, participantId, body.outcome),
+    );
+    publishGameBroadcast({ type: "updated", gameId, action, result });
+    response.status(200).json(result);
+  }) satisfies RequestHandler,
+
   offerDraw: (async (request, response) => {
     const user = requireCurrentUser(response);
     const gameId = readParamId(request, "gameId");
@@ -272,6 +348,24 @@ export const GameController = {
     const gameId = readParamId(request, "gameId");
     const result = serializeBigInts(await GameService.resign(gameId, user.id));
     publishGameBroadcast({ type: "updated", gameId, action: GAME_ACTIONS.RESIGNED, result });
+    response.status(200).json(result);
+  }) satisfies RequestHandler,
+
+  claimNoShow: (async (request, response) => {
+    const user = requireCurrentUser(response);
+    const gameId = readParamId(request, "gameId");
+    const body = readBody(request);
+    if (body.outcome !== "DRAW" && body.outcome !== "CANCEL" && body.outcome !== "WIN") {
+      response.status(422).json({ success: false, message: "Résolution d'absence invalide." });
+      return;
+    }
+    const action = body.outcome === "DRAW"
+      ? GAME_ACTIONS.NO_SHOW_DRAW
+      : body.outcome === "WIN"
+        ? GAME_ACTIONS.NO_SHOW_WIN
+        : GAME_ACTIONS.NO_SHOW_CANCELLED;
+    const result = serializeBigInts(await GameService.claimNoShow(gameId, user.id, body.outcome));
+    publishGameBroadcast({ type: "updated", gameId, action, result });
     response.status(200).json(result);
   }) satisfies RequestHandler,
 

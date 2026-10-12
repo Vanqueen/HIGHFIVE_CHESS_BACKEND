@@ -39,6 +39,10 @@ interface ClientToServerEvents {
     acknowledge?: Acknowledge,
   ) => void;
   [GAME_EVENTS.RESIGN]: (payload: { gameId: number }, acknowledge?: Acknowledge) => void;
+  [GAME_EVENTS.CLAIM_NO_SHOW]: (
+    payload: { gameId: number; outcome: "DRAW" | "CANCEL" | "WIN" },
+    acknowledge?: Acknowledge,
+  ) => void;
   [GAME_CHAT_EVENTS.SEND_MESSAGE]: (
     payload: { gameId: number; content: string },
     acknowledge?: Acknowledge,
@@ -518,16 +522,13 @@ export function attachGameGateway(httpServer: HttpServer) {
     const executeAction = async (
       rawGameId: unknown,
       action: string,
-      operation: (gameId: number) => Promise<unknown>,
+      operation: (
+        gameId: number,
+        actor: { userId: number } | { participantId: number },
+      ) => Promise<unknown>,
       acknowledge?: Acknowledge,
     ) => {
       try {
-        if (userSocket.data.guestParticipantId !== null) {
-          throw Object.assign(new Error("Cette action nécessite un compte utilisateur."), {
-            statusCode: 403,
-          });
-        }
-        await authenticateAccessToken(userSocket.data.accessToken);
         const gameId = readPositiveId(rawGameId);
         if (gameId === null) {
           throw Object.assign(new Error("Identifiant de partie invalide."), { statusCode: 422 });
@@ -535,7 +536,24 @@ export function attachGameGateway(httpServer: HttpServer) {
         if (!userSocket.data.joinedGameIds.has(gameId)) {
           throw Object.assign(new Error("Rejoignez la partie avant cette action."), { statusCode: 403 });
         }
-        const result = await operation(gameId);
+        const isGuest = userSocket.data.guestParticipantId !== null;
+        let actor: { userId: number } | { participantId: number };
+        if (isGuest) {
+          if (userSocket.data.guestGameId !== gameId) {
+            throw Object.assign(new Error("Session invité invalide pour cette partie."), {
+              statusCode: 403,
+            });
+          }
+          await AnonymousGameService.authenticateGuestSession(
+            gameId,
+            userSocket.data.guestParticipantId!,
+          );
+          actor = { participantId: userSocket.data.guestParticipantId! };
+        } else {
+          await authenticateAccessToken(userSocket.data.accessToken);
+          actor = { userId: userSocket.data.userId };
+        }
+        const result = await operation(gameId, actor);
         const serializedResult = serializePayload(result);
         io.to(`game:${gameId}`).emit(GAME_EVENTS.UPDATED, {
           action,
@@ -549,7 +567,7 @@ export function attachGameGateway(httpServer: HttpServer) {
           game &&
           typeof game === "object" &&
           "status" in game &&
-          game.status === "FINISHED"
+          (game.status === "FINISHED" || game.status === "CANCELLED")
         ) {
           stopClock(gameId);
         }
@@ -563,7 +581,9 @@ export function attachGameGateway(httpServer: HttpServer) {
       void executeAction(
         payload?.gameId,
         GAME_ACTIONS.DRAW_OFFERED,
-        (gameId) => GameService.offerDraw(gameId, userSocket.data.userId),
+        (gameId, actor) => "userId" in actor
+          ? GameService.offerDraw(gameId, actor.userId)
+          : GameService.offerDrawAsParticipant(gameId, actor.participantId),
         acknowledge,
       );
     });
@@ -575,7 +595,9 @@ export function attachGameGateway(httpServer: HttpServer) {
       void executeAction(
         payload.gameId,
         payload.accept ? GAME_ACTIONS.DRAW_ACCEPTED : GAME_ACTIONS.DRAW_DECLINED,
-        (gameId) => GameService.respondToDraw(gameId, userSocket.data.userId, payload.accept),
+        (gameId, actor) => "userId" in actor
+          ? GameService.respondToDraw(gameId, actor.userId, payload.accept)
+          : GameService.respondToDrawAsParticipant(gameId, actor.participantId, payload.accept),
         acknowledge,
       );
     });
@@ -583,7 +605,9 @@ export function attachGameGateway(httpServer: HttpServer) {
       void executeAction(
         payload?.gameId,
         GAME_ACTIONS.UNDO_REQUESTED,
-        (gameId) => GameService.requestUndo(gameId, userSocket.data.userId),
+        (gameId, actor) => "userId" in actor
+          ? GameService.requestUndo(gameId, actor.userId)
+          : GameService.requestUndoAsParticipant(gameId, actor.participantId),
         acknowledge,
       );
     });
@@ -595,7 +619,9 @@ export function attachGameGateway(httpServer: HttpServer) {
       void executeAction(
         payload.gameId,
         payload.accept ? GAME_ACTIONS.UNDO_ACCEPTED : GAME_ACTIONS.UNDO_DECLINED,
-        (gameId) => GameService.respondToUndo(gameId, userSocket.data.userId, payload.accept),
+        (gameId, actor) => "userId" in actor
+          ? GameService.respondToUndo(gameId, actor.userId, payload.accept)
+          : GameService.respondToUndoAsParticipant(gameId, actor.participantId, payload.accept),
         acknowledge,
       );
     });
@@ -603,7 +629,32 @@ export function attachGameGateway(httpServer: HttpServer) {
       void executeAction(
         payload?.gameId,
         GAME_ACTIONS.RESIGNED,
-        (gameId) => GameService.resign(gameId, userSocket.data.userId),
+        (gameId, actor) => "userId" in actor
+          ? GameService.resign(gameId, actor.userId)
+          : GameService.resignAsParticipant(gameId, actor.participantId),
+        acknowledge,
+      );
+    });
+    userSocket.on(GAME_EVENTS.CLAIM_NO_SHOW, (payload, acknowledge) => {
+      if (
+        payload?.outcome !== "DRAW" &&
+        payload?.outcome !== "CANCEL" &&
+        payload?.outcome !== "WIN"
+      ) {
+        acknowledge?.({ success: false, error: "Résolution d'absence invalide." });
+        return;
+      }
+      const action = payload.outcome === "DRAW"
+        ? GAME_ACTIONS.NO_SHOW_DRAW
+        : payload.outcome === "WIN"
+          ? GAME_ACTIONS.NO_SHOW_WIN
+          : GAME_ACTIONS.NO_SHOW_CANCELLED;
+      void executeAction(
+        payload.gameId,
+        action,
+        (gameId, actor) => "userId" in actor
+          ? GameService.claimNoShow(gameId, actor.userId, payload.outcome)
+          : GameService.claimNoShowAsParticipant(gameId, actor.participantId, payload.outcome),
         acknowledge,
       );
     });

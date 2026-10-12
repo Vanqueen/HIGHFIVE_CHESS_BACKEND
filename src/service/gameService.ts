@@ -10,6 +10,7 @@ import {
 } from "../repository/game-participant.repository";
 import {
   acceptUndoRequest,
+  claimGameNoShow,
   clearUndoRequest,
   createUndoRequest,
   finishGame,
@@ -22,6 +23,20 @@ import { findMovesByGameId } from "../repository/move.repository";
 import HttpError, { rethrowServiceError } from "./errorService";
 
 type GameRecord = NonNullable<Awaited<ReturnType<typeof findGame>>>;
+type GameActor = { userId: number } | { participantId: number };
+
+function findActorParticipant(
+  participants: Awaited<ReturnType<typeof findGameParticipantsByGameId>>,
+  actor: GameActor,
+) {
+  return participants.find((participant) =>
+    "userId" in actor
+      ? participant.userId === actor.userId && participant.participantType === "USER"
+      : participant.id === actor.participantId &&
+        participant.participantType === "GUEST" &&
+        participant.userId === null
+  );
+}
 
 function calculateClock(game: GameRecord, at = new Date()) {
   let white = game.whiteTimeRemainingMs;
@@ -147,14 +162,22 @@ export class GameService {
     }
   }
 
-  static async offerDraw(gameId: number, userId: number) {
+  static offerDraw(gameId: number, userId: number) {
+    return this.offerDrawForActor(gameId, { userId });
+  }
+
+  static offerDrawAsParticipant(gameId: number, participantId: number) {
+    return this.offerDrawForActor(gameId, { participantId });
+  }
+
+  private static async offerDrawForActor(gameId: number, actor: GameActor) {
     try {
       const { game } = await this.getClock(gameId);
       if (game.status !== "IN_PROGRESS") {
         throw new HttpError("La partie n'accepte pas d'offre de nulle.", 409, false);
       }
       const participants = await findGameParticipantsByGameId(gameId);
-      const participant = participants.find((row) => row.userId === userId);
+      const participant = findActorParticipant(participants, actor);
       if (!participant) throw new HttpError("Vous ne participez pas à cette partie.", 403, false);
       if (game.pendingUndoParticipantId !== null) {
         throw new HttpError("Une demande d'annulation est déjà en attente.", 409, false);
@@ -170,14 +193,22 @@ export class GameService {
     }
   }
 
-  static async respondToDraw(gameId: number, userId: number, accept: boolean) {
+  static respondToDraw(gameId: number, userId: number, accept: boolean) {
+    return this.respondToDrawForActor(gameId, { userId }, accept);
+  }
+
+  static respondToDrawAsParticipant(gameId: number, participantId: number, accept: boolean) {
+    return this.respondToDrawForActor(gameId, { participantId }, accept);
+  }
+
+  private static async respondToDrawForActor(gameId: number, actor: GameActor, accept: boolean) {
     try {
       const { game } = await this.getClock(gameId);
       if (game.status !== "IN_PROGRESS" || game.drawOfferParticipantId === null) {
         throw new HttpError("Aucune offre de nulle n'est en attente.", 409, false);
       }
       const participants = await findGameParticipantsByGameId(gameId);
-      const participant = participants.find((row) => row.userId === userId);
+      const participant = findActorParticipant(participants, actor);
       if (!participant) throw new HttpError("Vous ne participez pas à cette partie.", 403, false);
       if (participant.id === game.drawOfferParticipantId) {
         throw new HttpError("Vous ne pouvez pas répondre à votre propre offre.", 409, false);
@@ -200,14 +231,22 @@ export class GameService {
     }
   }
 
-  static async resign(gameId: number, userId: number) {
+  static resign(gameId: number, userId: number) {
+    return this.resignForActor(gameId, { userId });
+  }
+
+  static resignAsParticipant(gameId: number, participantId: number) {
+    return this.resignForActor(gameId, { participantId });
+  }
+
+  private static async resignForActor(gameId: number, actor: GameActor) {
     try {
       const { game } = await this.getClock(gameId);
       if (game.status !== "IN_PROGRESS") {
         throw new HttpError("La partie n'est pas en cours.", 409, false);
       }
       const participants = await findGameParticipantsByGameId(gameId);
-      const participant = participants.find((row) => row.userId === userId);
+      const participant = findActorParticipant(participants, actor);
       if (!participant) throw new HttpError("Vous ne participez pas à cette partie.", 403, false);
 
       const clock = calculateClock(game);
@@ -224,17 +263,25 @@ export class GameService {
     }
   }
 
-  static async requestUndo(gameId: number, userId: number) {
+  static requestUndo(gameId: number, userId: number) {
+    return this.requestUndoForActor(gameId, { userId });
+  }
+
+  static requestUndoAsParticipant(gameId: number, participantId: number) {
+    return this.requestUndoForActor(gameId, { participantId });
+  }
+
+  private static async requestUndoForActor(gameId: number, actor: GameActor) {
     try {
       const { game } = await this.getClock(gameId);
       if (game.type !== "LOCAL" || game.status !== "IN_PROGRESS") {
         throw new HttpError("L'annulation est réservée aux parties locales en cours.", 409, false);
       }
       const participants = await findGameParticipantsByGameId(gameId);
-      const participant = participants.find((row) => row.userId === userId);
+      const participant = findActorParticipant(participants, actor);
       if (!participant) throw new HttpError("Vous ne participez pas à cette partie.", 403, false);
-      if (participants.filter((row) => row.userId !== null).length !== 2) {
-        throw new HttpError("L'annulation nécessite deux joueurs authentifiés.", 409, false);
+      if (participants.length !== 2) {
+        throw new HttpError("L'annulation nécessite deux participants.", 409, false);
       }
       if (game.drawOfferParticipantId !== null) {
         throw new HttpError("Une offre de nulle est déjà en attente.", 409, false);
@@ -253,7 +300,82 @@ export class GameService {
     }
   }
 
-  static async respondToUndo(gameId: number, userId: number, accept: boolean) {
+  static respondToUndo(gameId: number, userId: number, accept: boolean) {
+    return this.respondToUndoForActor(gameId, { userId }, accept);
+  }
+
+  static respondToUndoAsParticipant(gameId: number, participantId: number, accept: boolean) {
+    return this.respondToUndoForActor(gameId, { participantId }, accept);
+  }
+
+  static claimNoShow(
+    gameId: number,
+    userId: number,
+    outcome: "DRAW" | "CANCEL" | "WIN",
+  ) {
+    return this.claimNoShowForActor(gameId, { userId }, outcome);
+  }
+
+  static claimNoShowAsParticipant(
+    gameId: number,
+    participantId: number,
+    outcome: "DRAW" | "CANCEL" | "WIN",
+  ) {
+    return this.claimNoShowForActor(gameId, { participantId }, outcome);
+  }
+
+  private static async claimNoShowForActor(
+    gameId: number,
+    actor: GameActor,
+    outcome: "DRAW" | "CANCEL" | "WIN",
+  ) {
+    try {
+      let game = await findGame(gameId);
+      if (!game) throw new HttpError("Partie introuvable.", 404, false);
+      const participants = await findGameParticipantsByGameId(gameId);
+      const claimant = findActorParticipant(participants, actor);
+      if (!claimant) throw new HttpError("Vous ne participez pas à cette partie.", 403, false);
+      if (
+        participants.length !== 2 ||
+        !participants.some((participant) => participant.color === "WHITE")
+      ) {
+        throw new HttpError("La partie ne contient pas deux participants valides.", 409, false);
+      }
+      if (claimant.color !== "BLACK") {
+        throw new HttpError("Seul le joueur attendant le premier coup peut signaler l'absence.", 403, false);
+      }
+      if (game.type === "TOURNAMENT" && claimant.participantType !== "USER") {
+        throw new HttpError("Les tournois sont réservés aux joueurs authentifiés.", 403, false);
+      }
+      if (outcome === "WIN" && game.type !== "TOURNAMENT") {
+        throw new HttpError("La victoire par absence est réservée aux parties de tournoi.", 422, false);
+      }
+      if (outcome === "CANCEL" && game.type === "TOURNAMENT") {
+        throw new HttpError("Une partie de tournoi ne peut pas être annulée pour absence.", 422, false);
+      }
+      await this.getClock(gameId);
+      game = await findGame(gameId);
+      if (!game) throw new HttpError("Partie introuvable.", 404, false);
+      if (
+        game.status !== "IN_PROGRESS" ||
+        game.activeColor !== "WHITE" ||
+        !game.startedAt ||
+        Date.now() - game.startedAt.getTime() < 60_000
+      ) {
+        throw new HttpError("Le délai d'absence d'une minute n'est pas encore atteint.", 409, false);
+      }
+
+      const result = await claimGameNoShow(gameId, claimant.id, outcome, game.startedAt);
+      if (!result) {
+        throw new HttpError("La partie a changé ou le premier coup a déjà été joué.", 409, false);
+      }
+      return result;
+    } catch (error) {
+      rethrowServiceError(error, "Erreur lors du signalement d'absence :");
+    }
+  }
+
+  private static async respondToUndoForActor(gameId: number, actor: GameActor, accept: boolean) {
     try {
       const { game } = await this.getClock(gameId);
       if (
@@ -264,7 +386,7 @@ export class GameService {
         throw new HttpError("Aucune demande d'annulation n'est en attente.", 409, false);
       }
       const participants = await findGameParticipantsByGameId(gameId);
-      const responder = participants.find((row) => row.userId === userId);
+      const responder = findActorParticipant(participants, actor);
       if (!responder) throw new HttpError("Vous ne participez pas à cette partie.", 403, false);
       if (responder.id === game.pendingUndoParticipantId) {
         throw new HttpError("Seul l'autre joueur peut répondre à cette demande.", 409, false);

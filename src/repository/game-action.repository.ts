@@ -85,6 +85,84 @@ export async function finishGame(
     });
 }
 
+export async function claimGameNoShow(
+  gameId: number,
+  participantId: number,
+  outcome: "DRAW" | "CANCEL" | "WIN",
+  expectedStartedAt: Date,
+) {
+  return db.transaction(async (tx) => {
+    const now = new Date();
+    const game = await tx.orm.public.Game
+      .where({
+        id: gameId,
+        status: "IN_PROGRESS",
+        activeColor: "WHITE",
+        startedAt: expectedStartedAt,
+      })
+      .first();
+    if (!game || now.getTime() - game.startedAt!.getTime() < 60_000) return null;
+
+    const claimant = await tx.orm.public.GameParticipant
+      .where({ id: participantId, gameId, color: "BLACK" })
+      .first();
+    if (!claimant) return null;
+    const absentPlayer = await tx.orm.public.GameParticipant
+      .where({ gameId, color: "WHITE" })
+      .first();
+    if (!absentPlayer || absentPlayer.id === claimant.id) return null;
+    if (outcome === "WIN" && game.type !== "TOURNAMENT") return null;
+    if (outcome === "CANCEL" && game.type === "TOURNAMENT") return null;
+
+    // Lock the game row before checking Move so a simultaneous first move cannot also commit.
+    const locked = await tx.orm.public.Game
+      .where({
+        id: gameId,
+        status: "IN_PROGRESS",
+        activeColor: "WHITE",
+        currentFen: game.currentFen,
+        startedAt: expectedStartedAt,
+      })
+      .update({ lastActivityAt: now });
+    if (!locked) return null;
+
+    const moves = await tx.orm.public.Move.where({ gameId }).all();
+    if (moves.length > 0) return null;
+
+    return tx.orm.public.Game
+      .where({
+        id: gameId,
+        status: "IN_PROGRESS",
+        activeColor: "WHITE",
+        currentFen: game.currentFen,
+        startedAt: expectedStartedAt,
+      })
+      .update(outcome === "CANCEL"
+        ? {
+            status: "CANCELLED",
+            result: null,
+            terminationReason: "CANCELLED",
+            endedAt: now,
+            activeColor: null,
+            clockStartedAt: null,
+            drawOfferParticipantId: null,
+            pendingUndoParticipantId: null,
+            lastActivityAt: now,
+          }
+        : {
+            status: "FINISHED",
+            result: outcome === "WIN" ? "BLACK_WIN" : "DRAW",
+            terminationReason: "NO_SHOW",
+            endedAt: now,
+            activeColor: null,
+            clockStartedAt: null,
+            drawOfferParticipantId: null,
+            pendingUndoParticipantId: null,
+            lastActivityAt: now,
+          });
+  });
+}
+
 export async function finishGameOnTimeout(
   gameId: number,
   expectedFen: string,

@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   getMessagesForGuest: vi.fn(),
   getMovesForGuest: vi.fn(),
   getMoves: vi.fn(),
+  offerDrawAsParticipant: vi.fn(),
   sendMessageAsGuest: vi.fn(),
   playMoveAsParticipant: vi.fn(),
   setOffline: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock("../service/gameService", () => ({
     getGameForUser: mocks.getGameForUser,
     startWhenReady: mocks.startWhenReady,
     startWhenParticipantsReady: mocks.startWhenParticipantsReady,
+    offerDrawAsParticipant: mocks.offerDrawAsParticipant,
   },
 }));
 vi.mock("../service/moveService", () => ({
@@ -250,5 +252,15 @@ describe("game gateway integration", () => {
       content: "Bonjour",
     });
     expect(mocks.sendMessageAsGuest).toHaveBeenCalledWith(41, 51, "Bonjour");
+
+    mocks.offerDrawAsParticipant.mockResolvedValue({
+      game: { ...game, status: "IN_PROGRESS" },
+      offeredBy: 51,
+    });
+    const drawAcknowledgement = new Promise<{ success: boolean }>((resolve) => {
+      client?.emit(GAME_EVENTS.OFFER_DRAW, { gameId: 41 }, resolve);
+    });
+    await expect(drawAcknowledgement).resolves.toMatchObject({ success: true });
+    expect(mocks.offerDrawAsParticipant).toHaveBeenCalledWith(41, 51);
   });
 });

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   acceptUndoRequest: vi.fn(),
+  claimGameNoShow: vi.fn(),
   clearUndoRequest: vi.fn(),
   createUndoRequest: vi.fn(),
   finishGame: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock("../repository/game-participant.repository", () => ({
 
 vi.mock("../repository/game-action.repository", () => ({
   acceptUndoRequest: mocks.acceptUndoRequest,
+  claimGameNoShow: mocks.claimGameNoShow,
   clearUndoRequest: mocks.clearUndoRequest,
   createUndoRequest: mocks.createUndoRequest,
   finishGame: mocks.finishGame,
@@ -54,6 +56,7 @@ const game = {
   whiteTimeRemainingMs: 700n,
   blackTimeRemainingMs: 800n,
   clockStartedAt: null,
+  startedAt: new Date(Date.now() - 61_000),
 };
 const participants = [
   { id: 1, gameId: 41, userId: 7, color: "WHITE", participantType: "USER" },
@@ -125,5 +128,91 @@ describe("GameService game actions", () => {
     expect(started.started).toBe(true);
     expect(started.game).toMatchObject({ status: "IN_PROGRESS", activeColor: "WHITE" });
     expect(mocks.startGameClock).toHaveBeenCalledOnce();
+  });
+
+  it("allows a guest participant to offer a draw using their participant id", async () => {
+    mocks.findGameParticipantsByGameId.mockResolvedValue([
+      participants[0],
+      { ...participants[1], userId: null, participantType: "GUEST" },
+    ]);
+    mocks.findGame.mockResolvedValue({ ...game, pendingUndoParticipantId: null });
+    mocks.setDrawOffer.mockResolvedValue(true);
+
+    await GameService.offerDrawAsParticipant(41, 2);
+
+    expect(mocks.setDrawOffer).toHaveBeenCalledWith(41, 2);
+  });
+
+  it("allows only the waiting black player to claim a no-show after one minute", async () => {
+    mocks.findGame.mockResolvedValue({
+      ...game,
+      type: "TOURNAMENT",
+      activeColor: "WHITE",
+      currentFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      startedAt: new Date(Date.now() - 61_000),
+    });
+    mocks.findGameParticipantsByGameId.mockResolvedValue([
+      participants[0],
+      participants[1],
+    ]);
+    mocks.claimGameNoShow.mockResolvedValue({ status: "FINISHED", result: "BLACK_WIN" });
+
+    await GameService.claimNoShow(41, 8, "WIN");
+
+    expect(mocks.claimGameNoShow).toHaveBeenCalledWith(
+      41,
+      2,
+      "WIN",
+      expect.any(Date),
+    );
+  });
+
+  it("allows a guest to claim a draw after the first-move no-show delay", async () => {
+    mocks.findGame.mockResolvedValue({
+      ...game,
+      type: "ONLINE",
+      activeColor: "WHITE",
+      startedAt: new Date(Date.now() - 61_000),
+    });
+    mocks.findGameParticipantsByGameId.mockResolvedValue([
+      participants[0],
+      { ...participants[1], userId: null, participantType: "GUEST" },
+    ]);
+    mocks.claimGameNoShow.mockResolvedValue({ status: "FINISHED", result: "DRAW" });
+
+    await GameService.claimNoShowAsParticipant(41, 2, "DRAW");
+
+    expect(mocks.claimGameNoShow).toHaveBeenCalledWith(
+      41,
+      2,
+      "DRAW",
+      expect.any(Date),
+    );
+  });
+
+  it("rejects a no-show claim before the one-minute deadline", async () => {
+    mocks.findGame.mockResolvedValue({
+      ...game,
+      activeColor: "WHITE",
+      currentFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      startedAt: new Date(),
+    });
+
+    await expect(GameService.claimNoShow(41, 8, "DRAW"))
+      .rejects.toMatchObject({ statusCode: 409 });
+    expect(mocks.claimGameNoShow).not.toHaveBeenCalled();
+  });
+
+  it("rejects the white player attempting to claim their own no-show", async () => {
+    mocks.findGame.mockResolvedValue({
+      ...game,
+      activeColor: "WHITE",
+      currentFen: "opening",
+      startedAt: new Date(Date.now() - 61_000),
+    });
+
+    await expect(GameService.claimNoShow(41, 7, "DRAW"))
+      .rejects.toMatchObject({ statusCode: 403 });
+    expect(mocks.claimGameNoShow).not.toHaveBeenCalled();
   });
 });

@@ -367,12 +367,15 @@ async function applyTournamentRatings(
       .where({ tournamentRoundId: round.id, isRated: true, status: "FINISHED" })
       .all());
   }
-  games.sort((left, right) =>
+  const rateableGames = games.filter((game) =>
+    game.terminationReason !== "NO_SHOW" && game.lastMoveAt !== null
+  );
+  rateableGames.sort((left, right) =>
     (left.endedAt?.getTime() ?? 0) - (right.endedAt?.getTime() ?? 0) || left.id - right.id
   );
 
   const ratingUserIds = new Set<number>();
-  for (const game of games) {
+  for (const game of rateableGames) {
     const participants = await tx.orm.public.GameParticipant.where({ gameId: game.id }).all();
     for (const participant of participants) {
       if (participant.participantType === "USER" && participant.userId !== null) {
@@ -389,7 +392,7 @@ async function applyTournamentRatings(
     if (!locked) throw new Error(`Impossible de verrouiller le compte ${userId} pour le rating.`);
   }
 
-  for (const game of games) {
+  for (const game of rateableGames) {
     if (!game.ratingCategory || !game.result) {
       throw new Error(`Paramètres de rating absents pour la partie ${game.id}.`);
     }

@@ -69,6 +69,7 @@ enum TerminationReason {
   FIFTY_MOVE_RULE
   INSUFFICIENT_MATERIAL
   CANCELLED
+  NO_SHOW
 }
 
 enum Color {

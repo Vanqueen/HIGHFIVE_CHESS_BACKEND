@@ -7,6 +7,7 @@ export const GAME_EVENTS = {
   REQUEST_UNDO: "request-undo",
   RESPOND_UNDO: "respond-undo",
   RESIGN: "resign",
+  CLAIM_NO_SHOW: "claim-no-show",
 } as const;
 
 export const GAME_ACTIONS = {
@@ -18,6 +19,9 @@ export const GAME_ACTIONS = {
   UNDO_ACCEPTED: "undo-accepted",
   UNDO_DECLINED: "undo-declined",
   RESIGNED: "resigned",
+  NO_SHOW_DRAW: "no-show-draw",
+  NO_SHOW_WIN: "no-show-win",
+  NO_SHOW_CANCELLED: "no-show-cancelled",
   TIMEOUT: "timeout",
   CHALLENGE_ACCEPTED: "challenge-accepted",
   CHALLENGE_DECLINED: "challenge-declined",

@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'ab5348b847e4004bbb52e4b52df9f7abf9ba17cbbd3749a75113ec17b5d09908'>;
+  StorageHashBase<'b7818c5d354030fc918c504f733cce7cbc969eaf233af50a374c0f84dec04d12'>;
 export type ExecutionHash =
   ExecutionHashBase<'d8c34a0b049a76c1f6f5a055b8d3ffcd114c2ca9483e661f21e49c9bf679b51b'>;
 export type ProfileHash =
@@ -343,6 +343,7 @@ export type FieldOutputTypes = {
         | 'FIFTY_MOVE_RULE'
         | 'INSUFFICIENT_MATERIAL'
         | 'CANCELLED'
+        | 'NO_SHOW'
         | null;
       readonly tournamentRoundId: CodecTypes['pg/int4@1']['output'] | null;
       readonly type: 'LOCAL' | 'ONLINE' | 'AI' | 'CHALLENGE' | 'TOURNAMENT';
@@ -686,6 +687,7 @@ export type FieldInputTypes = {
         | 'FIFTY_MOVE_RULE'
         | 'INSUFFICIENT_MATERIAL'
         | 'CANCELLED'
+        | 'NO_SHOW'
         | null;
       readonly tournamentRoundId: CodecTypes['pg/int4@1']['input'] | null;
       readonly type: 'LOCAL' | 'ONLINE' | 'AI' | 'CHALLENGE' | 'TOURNAMENT';
@@ -1029,6 +1031,7 @@ export type StorageColumnTypes = {
         | 'FIFTY_MOVE_RULE'
         | 'INSUFFICIENT_MATERIAL'
         | 'CANCELLED'
+        | 'NO_SHOW'
         | null;
       readonly tournamentRoundId: CodecTypes['pg/int4@1']['output'] | null;
       readonly type: 'LOCAL' | 'ONLINE' | 'AI' | 'CHALLENGE' | 'TOURNAMENT';
@@ -1372,6 +1375,7 @@ export type StorageColumnInputTypes = {
         | 'FIFTY_MOVE_RULE'
         | 'INSUFFICIENT_MATERIAL'
         | 'CANCELLED'
+        | 'NO_SHOW'
         | null;
       readonly tournamentRoundId: CodecTypes['pg/int4@1']['input'] | null;
       readonly type: 'LOCAL' | 'ONLINE' | 'AI' | 'CHALLENGE' | 'TOURNAMENT';
@@ -1735,6 +1739,7 @@ export namespace Models {
       | 'FIFTY_MOVE_RULE'
       | 'INSUFFICIENT_MATERIAL'
       | 'CANCELLED'
+      | 'NO_SHOW'
       | null;
     tournamentRoundId: CodecTypes['pg/int4@1']['output'] | null;
     type: 'LOCAL' | 'ONLINE' | 'AI' | 'CHALLENGE' | 'TOURNAMENT';
@@ -4950,6 +4955,7 @@ type ContractBase = Omit<
                 'FIFTY_MOVE_RULE',
                 'INSUFFICIENT_MATERIAL',
                 'CANCELLED',
+                'NO_SHOW',
               ];
             };
             readonly TournamentFormat: {
@@ -7954,6 +7960,7 @@ type ContractBase = Omit<
               { readonly name: 'FIFTY_MOVE_RULE'; readonly value: 'FIFTY_MOVE_RULE' },
               { readonly name: 'INSUFFICIENT_MATERIAL'; readonly value: 'INSUFFICIENT_MATERIAL' },
               { readonly name: 'CANCELLED'; readonly value: 'CANCELLED' },
+              { readonly name: 'NO_SHOW'; readonly value: 'NO_SHOW' },
             ];
           };
           readonly TournamentFormat: {
