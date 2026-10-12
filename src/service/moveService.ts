@@ -66,6 +66,22 @@ export class MoveService {
     userId: number,
     input: { from: string; to: string; promotion?: Promotion },
   ) {
+    return this.playMoveInternal(gameId, { userId }, input);
+  }
+
+  static async playMoveAsParticipant(
+    gameId: number,
+    participantId: number,
+    input: { from: string; to: string; promotion?: Promotion },
+  ) {
+    return this.playMoveInternal(gameId, { participantId }, input);
+  }
+
+  private static async playMoveInternal(
+    gameId: number,
+    player: { userId: number } | { participantId: number },
+    input: { from: string; to: string; promotion?: Promotion },
+  ) {
     try {
       if (!/^[a-h][1-8]$/.test(input.from) || !/^[a-h][1-8]$/.test(input.to)) {
         throw new HttpError("Cases de départ ou d'arrivée invalides.", 422, false);
@@ -89,8 +105,12 @@ export class MoveService {
       if (participants.length !== 2) {
         throw new HttpError("La partie doit avoir deux participants pour commencer.", 409, false);
       }
-      const participant = participants.find(
-        (candidate) => candidate.userId === userId && candidate.participantType === "USER",
+      const participant = participants.find((candidate) =>
+        "userId" in player
+          ? candidate.userId === player.userId && candidate.participantType === "USER"
+          : candidate.id === player.participantId &&
+            candidate.participantType === "GUEST" &&
+            candidate.userId === null,
       );
       if (!participant) {
         throw new HttpError("Vous ne participez pas à cette partie.", 403, false);
@@ -251,6 +271,25 @@ export class MoveService {
       return await findMovesByGameId(gameId);
     } catch (error) {
       rethrowServiceError(error, "Erreur lors de la récupération des coups :");
+    }
+  }
+
+  static async getMovesForGuest(gameId: number, participantId: number) {
+    try {
+      const game = await findGame(gameId);
+      if (!game) throw new HttpError("Partie introuvable.", 404, false);
+      const participants = await findGameParticipantsByGameId(gameId);
+      if (!participants.some(
+        (participant) =>
+          participant.id === participantId &&
+          participant.participantType === "GUEST" &&
+          participant.userId === null,
+      )) {
+        throw new HttpError("Vous ne participez pas à cette partie.", 403, false);
+      }
+      return await findMovesByGameId(gameId);
+    } catch (error) {
+      rethrowServiceError(error, "Erreur lors de la récupération des coups du joueur invité :");
     }
   }
 }

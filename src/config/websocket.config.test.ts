@@ -20,7 +20,10 @@ describe("getWebSocketConfig", () => {
   });
 
   it("uses the local client origin by default outside production", () => {
-    expect(getWebSocketConfig({ NODE_ENV: "development" }).cors.origin)
-      .toEqual(["http://localhost:5173"]);
+    const cors = getWebSocketConfig({ NODE_ENV: "development" }).cors;
+    if (!cors || typeof cors === "function" || !Array.isArray(cors.origin)) {
+      throw new Error("La configuration CORS doit fournir une liste d'origines.");
+    }
+    expect(cors.origin).toEqual(["http://localhost:5173"]);
   });
 });

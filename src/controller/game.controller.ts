@@ -8,6 +8,9 @@ import { MoveService } from "../service/moveService";
 import { GameChatService } from "../service/gameChatService";
 import { GAME_ACTIONS } from "../events/game.events";
 import { publishGameBroadcast } from "../events/game.broadcast";
+import { AnonymousGameService } from "../service/anonymousGameService";
+import HttpError from "../service/errorService";
+import { verifyGuestGameToken } from "../utils/guestGameToken";
 import {
   readBody,
   readParamId,
@@ -17,6 +20,28 @@ import {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function requireGuestParticipantId(
+  authorization: string | undefined,
+  gameId: number,
+) {
+  const match = authorization ? /^Bearer\s+(\S+)$/i.exec(authorization) : null;
+  const token = match?.[1];
+  if (!token) throw new HttpError("Authentification invité requise.", 401, false);
+
+  const payload = verifyGuestGameToken(token, "guest-session");
+  if (!payload || payload.kind !== "guest-session") {
+    throw new HttpError("Session de joueur invité invalide ou expirée.", 401, false);
+  }
+  if (payload.gameId !== gameId) {
+    throw new HttpError("Cette session invité ne correspond pas à cette partie.", 403, false);
+  }
+  const participant = await AnonymousGameService.authenticateGuestSession(
+    gameId,
+    payload.participantId,
+  );
+  return participant.id;
 }
 
 export const GameController = {
@@ -103,12 +128,95 @@ export const GameController = {
     response.status(201).json(serializedResult);
   }) satisfies RequestHandler,
 
+  playGuestMove: (async (request, response) => {
+    const gameId = readParamId(request, "gameId");
+    const participantId = await requireGuestParticipantId(
+      request.headers.authorization,
+      gameId,
+    );
+    const body = readBody(request);
+    if (
+      typeof body.from !== "string" ||
+      typeof body.to !== "string" ||
+      (body.promotion !== undefined &&
+        body.promotion !== "QUEEN" &&
+        body.promotion !== "ROOK" &&
+        body.promotion !== "BISHOP" &&
+        body.promotion !== "KNIGHT")
+    ) {
+      response.status(422).json({ success: false, message: "Données de coup invalides." });
+      return;
+    }
+
+    const result = await MoveService.playMoveAsParticipant(gameId, participantId, {
+      from: body.from,
+      to: body.to,
+      ...(body.promotion ? { promotion: body.promotion } : {}),
+    });
+    if ("timedOut" in result) {
+      const serializedResult = serializeBigInts({ game: result.game });
+      publishGameBroadcast({
+        type: "updated",
+        gameId,
+        action: GAME_ACTIONS.TIMEOUT,
+        result: serializedResult,
+      });
+      response.status(201).json(serializedResult);
+      return;
+    }
+
+    const state = await GameService.getGameForGuest(gameId, participantId);
+    const serializedResult = serializeBigInts({ game: state.game, move: result.move });
+    publishGameBroadcast({ type: "move-played", gameId, result: serializedResult });
+    response.status(201).json(serializedResult);
+  }) satisfies RequestHandler,
+
   getMoves: (async (request, response) => {
     const user = requireCurrentUser(response);
     response.status(200).json(await MoveService.getMoves(
       readParamId(request, "gameId"),
       user.id,
     ));
+  }) satisfies RequestHandler,
+
+  getGuestMoves: (async (request, response) => {
+    const gameId = readParamId(request, "gameId");
+    const participantId = await requireGuestParticipantId(
+      request.headers.authorization,
+      gameId,
+    );
+    response.status(200).json(serializeBigInts(
+      await MoveService.getMovesForGuest(gameId, participantId),
+    ));
+  }) satisfies RequestHandler,
+
+  getGuestMessages: (async (request, response) => {
+    const gameId = readParamId(request, "gameId");
+    const participantId = await requireGuestParticipantId(
+      request.headers.authorization,
+      gameId,
+    );
+    response.status(200).json(serializeBigInts(
+      await GameChatService.getMessagesForGuest(gameId, participantId),
+    ));
+  }) satisfies RequestHandler,
+
+  sendGuestMessage: (async (request, response) => {
+    const gameId = readParamId(request, "gameId");
+    const participantId = await requireGuestParticipantId(
+      request.headers.authorization,
+      gameId,
+    );
+    const body = readBody(request);
+    if (typeof body.content !== "string") {
+      response.status(422).json({ success: false, message: "Le contenu du message est requis." });
+      return;
+    }
+    const message = serializeBigInts(
+      await GameChatService.sendMessageAsGuest(gameId, participantId, body.content),
+    );
+    publishGameBroadcast({ type: "chat-message", gameId, message });
+    response.status(201).json(message);
   }) satisfies RequestHandler,
 
   offerDraw: (async (request, response) => {

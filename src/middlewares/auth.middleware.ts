@@ -98,6 +98,16 @@ export const authenticate: RequestHandler = async (request, response, next) => {
   }
 };
 
+export const authenticateOptional: RequestHandler = async (request, response, next) => {
+  try {
+    const token = getBearerToken(request.headers.authorization);
+    if (token) response.locals.user = await authenticateAccessToken(token);
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
 export function requireRole(...roles: Array<"USER" | "ORGANIZER" | "ADMIN">): RequestHandler {
   return (_request, response, next) => {
     const user = response.locals.user as AuthenticatedUser | undefined;

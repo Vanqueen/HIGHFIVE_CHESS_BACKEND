@@ -5,6 +5,8 @@ import fileUpload from "express-fileupload";
 import { connectDatabase } from "./prisma/db.ts";
 import authRouter from "./routes/auth";
 import gameRouter from "./routes/game";
+import challengesRouter from "./routes/challenges";
+import invitationLinksRouter from "./routes/invitation-links";
 import usersRouter from "./routes/users";
 import { errorHandler } from "./middlewares/error.middleware";
 import { attachGameGateway } from "./websocket/game.gateway";
@@ -27,12 +29,19 @@ async function startServer() {
       preserveExtension: true,
     }));
 
+    app.get('/', (_request, response) => {
+      response.status(200).json({ message: "Welcome to the server!" });
+    });
+
     app.get("/health", (_request, response) => {
+      console.log("Hello world from the server!");
       response.status(200).json({ success: true });
     });
     app.use("/api/auth", authRouter);
     app.use("/api/users", usersRouter);
     app.use("/api/games", gameRouter);
+    app.use("/api/challenges", challengesRouter);
+    app.use("/api/invitation-links", invitationLinksRouter);
     app.use(errorHandler);
 
     const httpServer = createServer(app);

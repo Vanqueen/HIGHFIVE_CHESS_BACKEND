@@ -4,6 +4,10 @@ import { authenticate } from "../middlewares/auth.middleware";
 
 const gameRouter = Router();
 
+gameRouter.post("/guest/:gameId/moves", GameController.playGuestMove);
+gameRouter.get("/guest/:gameId/moves", GameController.getGuestMoves);
+gameRouter.get("/guest/:gameId/messages", GameController.getGuestMessages);
+gameRouter.post("/guest/:gameId/messages", GameController.sendGuestMessage);
 gameRouter.use(authenticate);
 gameRouter.post("/", GameController.createGame);
 gameRouter.get("/me", GameController.getGamesForCurrentUser);

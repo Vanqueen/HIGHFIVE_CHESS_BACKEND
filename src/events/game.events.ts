@@ -19,4 +19,8 @@ export const GAME_ACTIONS = {
   UNDO_DECLINED: "undo-declined",
   RESIGNED: "resigned",
   TIMEOUT: "timeout",
+  CHALLENGE_ACCEPTED: "challenge-accepted",
+  CHALLENGE_DECLINED: "challenge-declined",
+  CHALLENGE_CANCELLED: "challenge-cancelled",
+  CHALLENGE_EXPIRED: "challenge-expired",
 } as const;

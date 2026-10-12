@@ -17,6 +17,13 @@ export async function createNotification(data: CreateNotificationData) {
   return db.orm.public.Notification.create(data);
 }
 
+export async function findNotificationsForUser(userId: number, limit = 50) {
+  return db.orm.public.Notification.where({ userId })
+    .orderBy((notification) => notification.createdAt.desc())
+    .limit(limit)
+    .all();
+}
+
 export async function updateNotification(id: number, updates: UpdateNotificationData) {
   return db.orm.public.Notification.where({ id }).update(updates);
 }
