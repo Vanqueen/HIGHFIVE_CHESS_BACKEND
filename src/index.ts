@@ -7,6 +7,7 @@ import authRouter from "./routes/auth";
 import gameRouter from "./routes/game";
 import challengesRouter from "./routes/challenges";
 import invitationLinksRouter from "./routes/invitation-links";
+import tournamentsRouter from "./routes/tournaments";
 import usersRouter from "./routes/users";
 import { errorHandler } from "./middlewares/error.middleware";
 import { attachGameGateway } from "./websocket/game.gateway";
@@ -42,6 +43,7 @@ async function startServer() {
     app.use("/api/games", gameRouter);
     app.use("/api/challenges", challengesRouter);
     app.use("/api/invitation-links", invitationLinksRouter);
+    app.use("/api/tournaments", tournamentsRouter);
     app.use(errorHandler);
 
     const httpServer = createServer(app);
