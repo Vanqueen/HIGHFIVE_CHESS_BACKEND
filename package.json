@@ -46,7 +46,7 @@
     "dotenv": "^18.0.5",
     "express": "^5.2.1",
     "express-fileupload": "^1.5.2",
-    "express-rate-limit": "^8.7.0",
+    "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
     "http": "^0.0.1-security",
     "https": "^1.0.0",
@@ -81,5 +81,9 @@
     "@hono/node-server": "^1.19.15",
     "lodash": "^4.18.1",
     "valibot": "^1.4.2"
+  },
+  "allowScripts": {
+    "argon2@0.45.1": true,
+    "esbuild@0.28.2": true
   }
 }
