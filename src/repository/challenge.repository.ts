@@ -1,3 +1,4 @@
+import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.ts";
 import type { NotificationBroadcast } from "../events/notification.broadcast";
 import { createNotificationInTransaction } from "./notification.repository";
@@ -143,7 +144,7 @@ async function transitionPendingChallenge(
 ) {
   // A cancelled or expired invitation must not leave its associated game joinable.
   return db.transaction(async (tx) => {
-    const now = new Date();
+    const now = Temporal.Now.instant();
     const eligibleChallenge = tx.orm.public.Challenge
       .where({ id: challengeId, status: "PENDING", ...selector });
     const updated = status === "EXPIRED"
@@ -230,7 +231,7 @@ export async function expirePendingChallenge(challengeId: number) {
 }
 
 export async function expireDuePendingChallenges(limit = 100) {
-  const now = new Date();
+  const now = Temporal.Now.instant();
   const challenges = await db.orm.public.Challenge
     .where({ status: "PENDING" })
     .where((challenge) => challenge.expiresAt.lte(now))
