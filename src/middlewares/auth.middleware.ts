@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 import type { JwtPayload } from "jsonwebtoken";
 import jwt from "jsonwebtoken";
+import { Temporal } from "temporal-polyfill";
 import { findSession } from "../repository/session.repository";
 import { findUser } from "../repository/user.repository";
 import HttpError from "../service/errorService";
@@ -54,7 +55,8 @@ export async function authenticateAccessToken(token: string): Promise<Authentica
     user.role !== decoded.role ||
     user.deletedAt !== null ||
     user.accountStatus !== "ACTIVE" ||
-    (user.lockedUntil !== null && user.lockedUntil > new Date())
+    (user.lockedUntil !== null &&
+      user.lockedUntil.epochMilliseconds > Temporal.Now.instant().epochMilliseconds)
   ) {
     throw new HttpError("Compte indisponible.", 401, false);
   }
@@ -64,7 +66,7 @@ export async function authenticateAccessToken(token: string): Promise<Authentica
     !session ||
     session.userId !== user.id ||
     session.revokedAt !== null ||
-    session.expiresAt <= new Date()
+    session.expiresAt.epochMilliseconds <= Temporal.Now.instant().epochMilliseconds
   ) {
     throw new HttpError("Session expirée ou révoquée.", 401, false);
   }

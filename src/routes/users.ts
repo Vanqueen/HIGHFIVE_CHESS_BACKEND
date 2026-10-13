@@ -7,6 +7,16 @@ const usersRouter = Router();
 usersRouter.use(authenticate);
 
 usersRouter.get("/", requireRole("ADMIN"), UserController.getAllUsers);
+usersRouter.get("/me", authenticate, async (req, res) => {
+  try {
+    const authenticatedReq = req as typeof req & { user: unknown };
+    res.status(200).json({ user: authenticatedReq.user });
+  } catch (err) {
+    res.status(500).json({
+      message: err instanceof Error ? err.message : "Internal server error",
+    });
+  }
+});
 usersRouter.get("/:userId", UserController.getUserById);
 usersRouter.patch("/:userId/role", requireRole("ADMIN"), UserController.changeUserRole);
 usersRouter.patch("/me/email", UserController.changeUserEmail);

@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { Temporal } from "temporal-polyfill";
 import {
   advanceTournamentRound,
   cancelTournament,
@@ -40,6 +41,10 @@ const MAX_CLOCK_SECONDS = 2 * 60 * 60;
 const MAX_INCREMENT_SECONDS = 180;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const STANDARD_INVITE_LIFETIME_MINUTES = 60 * 24 * 7;
+
+function timestamp(value: Date | { epochMilliseconds: number }) {
+  return value instanceof Date ? value.getTime() : value.epochMilliseconds;
+}
 
 type TournamentRecord = NonNullable<Awaited<ReturnType<typeof findTournament>>>;
 type ParticipantRecord = Awaited<ReturnType<typeof findTournamentParticipants>>[number];
@@ -182,7 +187,7 @@ async function readStandings(tournamentId: number) {
     // In an odd field, the active player without a pairing receives one bye point.
     const byeCandidates = standings.filter((standing) =>
       (standing.status === "ACTIVE" || standing.status === "FINISHED") &&
-      standing.joinedAt <= round.createdAt &&
+      timestamp(standing.joinedAt) <= timestamp(round.createdAt) &&
       !pairedIds.has(standing.participantId)
     );
     if (byeCandidates.length === 1) {
@@ -418,7 +423,10 @@ export class TournamentService {
       if (tournament.status !== "DRAFT") {
         throw new HttpError("Seul un tournoi en brouillon peut ouvrir les inscriptions.", 409, false);
       }
-      if (tournament.startsAt <= new Date()) {
+      if (
+        tournament.startsAt.epochMilliseconds <=
+        Temporal.Now.instant().epochMilliseconds
+      ) {
         throw new HttpError("Le tournoi aurait déjà dû commencer.", 409, false);
       }
       const updated = await setTournamentStatus(
@@ -604,7 +612,10 @@ export class TournamentService {
       if (tournament.status !== "REGISTRATION_CLOSED") {
         throw new HttpError("Fermez les inscriptions avant le démarrage.", 409, false);
       }
-      if (tournament.startsAt > new Date()) {
+      if (
+        tournament.startsAt.epochMilliseconds >
+        Temporal.Now.instant().epochMilliseconds
+      ) {
         throw new HttpError("Le tournoi ne peut pas commencer avant sa date prévue.", 409, false);
       }
       const participants = await findTournamentParticipants(tournamentId);

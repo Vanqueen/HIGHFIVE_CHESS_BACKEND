@@ -5,10 +5,14 @@ export interface PairingPlayer {
   score: number;
   wins: number;
   seed: number | null;
-  joinedAt: Date;
+  joinedAt: Date | { epochMilliseconds: number };
   whiteGames: number;
   blackGames: number;
   hadBye: boolean;
+}
+
+function timestamp(value: Date | { epochMilliseconds: number }) {
+  return value instanceof Date ? value.getTime() : value.epochMilliseconds;
 }
 
 export interface Pairing {
@@ -25,7 +29,7 @@ function rankingOrder(left: PairingPlayer, right: PairingPlayer) {
   return right.score - left.score ||
     right.wins - left.wins ||
     (left.seed ?? Number.MAX_SAFE_INTEGER) - (right.seed ?? Number.MAX_SAFE_INTEGER) ||
-    left.joinedAt.getTime() - right.joinedAt.getTime() ||
+    timestamp(left.joinedAt) - timestamp(right.joinedAt) ||
     left.id - right.id;
 }
 
@@ -150,7 +154,7 @@ export interface SwissStandingLike {
   score: number;
   wins: number;
   seed: number | null;
-  joinedAt: Date;
+  joinedAt: Date | { epochMilliseconds: number };
   opponents: Set<number>;
 }
 
@@ -183,7 +187,7 @@ export function sortSwissStandings<T extends SwissStandingLike>(standings: T[]) 
       right.medianBuchholz - left.medianBuchholz ||
       right.standing.wins - left.standing.wins ||
       (left.standing.seed ?? Number.MAX_SAFE_INTEGER) - (right.standing.seed ?? Number.MAX_SAFE_INTEGER) ||
-      left.standing.joinedAt.getTime() - right.standing.joinedAt.getTime() ||
+      timestamp(left.standing.joinedAt) - timestamp(right.standing.joinedAt) ||
       left.standing.participantId - right.standing.participantId,
     )
     .map(({ standing }) => standing);

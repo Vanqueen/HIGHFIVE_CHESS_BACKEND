@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { Temporal } from "temporal-polyfill";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -91,7 +92,7 @@ describe("MoveService.playMove", () => {
       result: null,
       terminationReason: null,
     });
-    expect(updates.startedAt).toBeInstanceOf(Date);
+    expect(updates.startedAt).toBeInstanceOf(Temporal.Instant);
   });
 
   it("finishes a game on threefold repetition after replaying the move history", async () => {

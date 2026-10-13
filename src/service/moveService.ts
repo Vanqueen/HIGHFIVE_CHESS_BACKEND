@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { Temporal } from "temporal-polyfill";
 import { findGame } from "../repository/game.repository";
 import { findGameParticipantsByGameId } from "../repository/game-participant.repository";
 import {
@@ -21,6 +22,10 @@ const promotionSymbols: Record<Promotion, "q" | "r" | "b" | "n"> = {
 };
 
 const STANDARD_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+function timestamp(value: Date | { epochMilliseconds: number }) {
+  return value instanceof Date ? value.getTime() : value.epochMilliseconds;
+}
 
 export class MoveService {
   static async backfillMissingFenBefore() {
@@ -141,11 +146,14 @@ export class MoveService {
         throw new HttpError("Ce n'est pas votre tour.", 409, false);
       }
 
-      const now = new Date();
+      const now = Temporal.Now.instant();
       let whiteTimeRemainingMs = game.whiteTimeRemainingMs;
       let blackTimeRemainingMs = game.blackTimeRemainingMs;
       if (game.initialTimeSeconds > 0 && game.status === "IN_PROGRESS" && game.clockStartedAt) {
-        const elapsedMs = BigInt(Math.max(0, now.getTime() - game.clockStartedAt.getTime()));
+        const elapsedMs = BigInt(Math.max(
+          0,
+          now.epochMilliseconds - timestamp(game.clockStartedAt),
+        ));
         if (movingColor === "WHITE") {
           whiteTimeRemainingMs =
             whiteTimeRemainingMs > elapsedMs ? whiteTimeRemainingMs - elapsedMs : 0n;

@@ -1,5 +1,6 @@
 import { db } from "../prisma/db.ts";
 import { calculateTournamentRatingChanges } from "../service/tournamentRating";
+import { Temporal } from "temporal-polyfill";
 
 const STANDARD_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -98,7 +99,7 @@ export async function registerTournamentUser(
   invitationLinkId: number | null = null,
 ) {
   return db.transaction(async (tx) => {
-    const now = new Date();
+    const now = Temporal.Now.instant();
     const opened = await tx.orm.public.Tournament
       .where({ id: tournamentId, status: "REGISTRATION_OPEN" })
       .update({ status: "REGISTRATION_OPEN" });
@@ -112,8 +113,8 @@ export async function registerTournamentUser(
     if (!tournament) return { kind: "missing" as const };
     if (
       tournament.status !== "REGISTRATION_OPEN" ||
-      tournament.registrationStartsAt > now ||
-      tournament.registrationEndsAt <= now
+      tournament.registrationStartsAt.epochMilliseconds > now.epochMilliseconds ||
+      tournament.registrationEndsAt.epochMilliseconds <= now.epochMilliseconds
     ) {
       return { kind: "closed" as const };
     }
@@ -222,7 +223,7 @@ export async function withdrawTournamentUser(tournamentId: number, userId: numbe
     if (!participant) return { kind: "not-registered" as const };
     const updated = await tx.orm.public.TournamentParticipant
       .where({ id: participant.id, status: "REGISTERED" })
-      .update({ status: "WITHDRAWN", leftAt: new Date() });
+      .update({ status: "WITHDRAWN", leftAt: Temporal.Now.instant() });
     return updated
       ? { kind: "withdrawn" as const, participant: updated }
       : { kind: "not-registered" as const };
@@ -290,7 +291,7 @@ async function createRound(
   roundNumber: number,
   setup: TournamentRoundSetup,
 ) {
-  const now = new Date();
+  const now = Temporal.Now.instant();
   const round = await tx.orm.public.TournamentRound.create({
     tournamentId,
     roundNumber,
@@ -371,7 +372,8 @@ async function applyTournamentRatings(
     game.terminationReason !== "NO_SHOW" && game.lastMoveAt !== null
   );
   rateableGames.sort((left, right) =>
-    (left.endedAt?.getTime() ?? 0) - (right.endedAt?.getTime() ?? 0) || left.id - right.id
+    (left.endedAt?.epochMilliseconds ?? 0) -
+      (right.endedAt?.epochMilliseconds ?? 0) || left.id - right.id
   );
 
   const ratingUserIds = new Set<number>();
@@ -514,7 +516,10 @@ export async function startTournamentWithRound(
     const tournament = await tx.orm.public.Tournament
       .where({ id: tournamentId, organizerId, status: "REGISTRATION_CLOSED" })
       .first();
-    if (!tournament || tournament.startsAt > new Date()) return null;
+    if (
+      !tournament ||
+      tournament.startsAt.epochMilliseconds > Temporal.Now.instant().epochMilliseconds
+    ) return null;
 
     const participants = await tx.orm.public.TournamentParticipant
       .where({ tournamentId, status: "REGISTERED" })
@@ -551,7 +556,7 @@ export async function advanceTournamentRound(
     const games = await tx.orm.public.Game.where({ tournamentRoundId: round.id }).all();
     if (games.some((game) => game.status !== "FINISHED")) return null;
 
-    const now = new Date();
+    const now = Temporal.Now.instant();
     await tx.orm.public.TournamentRound
       .where({ id: round.id, status: "IN_PROGRESS" })
       .update({ status: "FINISHED", endsAt: now });
@@ -605,7 +610,7 @@ export async function cancelTournament(
     ) return false;
     const tournament = await tx.orm.public.Tournament
       .where({ id: tournamentId, organizerId, status: current.status })
-      .update({ status: "CANCELLED", endsAt: new Date() });
+      .update({ status: "CANCELLED", endsAt: Temporal.Now.instant() });
     if (!tournament) return false;
     await tx.orm.public.InvitationLink
       .where({ tournamentId, status: "ACTIVE" })
