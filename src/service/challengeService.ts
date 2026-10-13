@@ -3,7 +3,7 @@ import {
   cancelPendingChallenge,
   createChallengeWithGame,
   declinePendingChallenge,
-  expirePendingChallenge,
+  expireDuePendingChallenges,
   findChallenge,
   findChallengesByCreator,
   findChallengesByInvitee,
@@ -11,6 +11,10 @@ import {
 import { findGamesByChallenge } from "../repository/game.repository";
 import { findUser } from "../repository/user.repository";
 import { NotificationService } from "./notificationService";
+import {
+  expireChallengeAndNotify,
+  publishChallengeExpiration,
+} from "./challengeExpirationService";
 import { publishGameBroadcast } from "../events/game.broadcast";
 import { GAME_ACTIONS } from "../events/game.events";
 import HttpError, { rethrowServiceError } from "./errorService";
@@ -32,6 +36,11 @@ function assertTimeControl(initialTimeSeconds: number, incrementSeconds: number)
   ) {
     throw new HttpError("Contrôle du temps invalide.", 422, false);
   }
+}
+
+function epochMilliseconds(value: Date) {
+  const temporalValue = Reflect.get(value, "epochMilliseconds");
+  return typeof temporalValue === "number" ? temporalValue : value.getTime();
 }
 
 export class ChallengeService {
@@ -70,16 +79,13 @@ export class ChallengeService {
         invitedUserId,
         status: "PENDING",
         expiresAt: new Date(Date.now() + CHALLENGE_LIFETIME_MS),
-      }, initialTimeSeconds, incrementSeconds);
-      if (invitedUserId !== null) {
-        await NotificationService.notifyChallengeReceived(
-          invitedUserId,
-          created.challenge.id,
-          created.game.id,
-          creator.username,
-        );
-      }
-      return created;
+      }, initialTimeSeconds, incrementSeconds, creator.username);
+      NotificationService.publishMany(created.notifications);
+      return {
+        challenge: created.challenge,
+        game: created.game,
+        participant: created.participant,
+      };
     } catch (error) {
       rethrowServiceError(error, "Erreur lors de la création du défi :");
     }
@@ -96,14 +102,18 @@ export class ChallengeService {
         findChallengesByInvitee(userId, limit),
       ]);
       const challenges = [...created, ...received]
-        .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+        .sort((left, right) =>
+          epochMilliseconds(right.createdAt) - epochMilliseconds(left.createdAt)
+        )
         .slice(0, limit);
 
       const now = new Date();
       return Promise.all(challenges.map(async (challenge) => {
-        // Expiry is applied lazily here and on acceptance; no background worker exists yet.
-        if (challenge.status === "PENDING" && challenge.expiresAt <= now) {
-          await expirePendingChallenge(challenge.id);
+        if (
+          challenge.status === "PENDING" &&
+          epochMilliseconds(challenge.expiresAt) <= now.getTime()
+        ) {
+          await this.expireChallenge(challenge.id);
           return { ...challenge, status: "EXPIRED" as const };
         }
         return challenge;
@@ -124,26 +134,25 @@ export class ChallengeService {
       if (challenge.status !== "PENDING") {
         throw new HttpError("Ce défi n'est plus en attente.", 409, false);
       }
-      if (challenge.expiresAt <= new Date()) {
-        await expirePendingChallenge(challengeId);
+      if (epochMilliseconds(challenge.expiresAt) <= Date.now()) {
+        await this.expireChallenge(challengeId);
         throw new HttpError("Ce défi a expiré.", 410, false);
       }
 
       const accepted = await acceptPendingChallenge(challengeId, userId);
       if (!accepted) throw new HttpError("Le défi a déjà été traité ou a expiré.", 409, false);
-      await NotificationService.notifyChallengeAccepted(
-        accepted.challenge.creatorId,
-        challengeId,
-        accepted.game.id,
-        "Votre adversaire",
-      );
+      NotificationService.publishMany(accepted.notifications);
       publishGameBroadcast({
         type: "updated",
         gameId: accepted.game.id,
         action: GAME_ACTIONS.CHALLENGE_ACCEPTED,
         result: { challenge: accepted.challenge, game: accepted.game },
       });
-      return accepted;
+      return {
+        challenge: accepted.challenge,
+        game: accepted.game,
+        participant: accepted.participant,
+      };
     } catch (error) {
       rethrowServiceError(error, "Erreur lors de l'acceptation du défi :");
     }
@@ -156,30 +165,28 @@ export class ChallengeService {
       if (challenge.invitedUserId !== userId) {
         throw new HttpError("Ce défi ne vous est pas destiné.", 403, false);
       }
-      if (challenge.status === "PENDING" && challenge.expiresAt <= new Date()) {
-        await expirePendingChallenge(challengeId);
+      if (
+        challenge.status === "PENDING" &&
+        epochMilliseconds(challenge.expiresAt) <= Date.now()
+      ) {
+        await this.expireChallenge(challengeId);
         throw new HttpError("Ce défi a expiré.", 410, false);
       }
-      const updated = await declinePendingChallenge(challengeId, userId);
-      if (!updated) {
+      const transition = await declinePendingChallenge(challengeId, userId);
+      if (!transition) {
         throw new HttpError("Ce défi n'est plus en attente.", 409, false);
       }
+      NotificationService.publishMany(transition.notifications);
       const games = await findGamesByChallenge(challengeId, 1);
       const game = games[0];
       if (!game) throw new HttpError("Partie associée au défi introuvable.", 500, false);
-      await NotificationService.notifyChallengeClosed(
-        challenge.creatorId,
-        challengeId,
-        game.id,
-        "declined",
-      );
       publishGameBroadcast({
         type: "updated",
         gameId: game.id,
         action: GAME_ACTIONS.CHALLENGE_DECLINED,
-        result: { challenge: updated, game },
+        result: { challenge: transition.challenge, game },
       });
-      return updated;
+      return transition.challenge;
     } catch (error) {
       rethrowServiceError(error, "Erreur lors du refus du défi :");
     }
@@ -192,34 +199,42 @@ export class ChallengeService {
       if (challenge.creatorId !== userId) {
         throw new HttpError("Seul le créateur peut annuler ce défi.", 403, false);
       }
-      if (challenge.status === "PENDING" && challenge.expiresAt <= new Date()) {
-        await expirePendingChallenge(challengeId);
+      if (
+        challenge.status === "PENDING" &&
+        epochMilliseconds(challenge.expiresAt) <= Date.now()
+      ) {
+        await this.expireChallenge(challengeId);
         throw new HttpError("Ce défi a expiré.", 410, false);
       }
-      const updated = await cancelPendingChallenge(challengeId, userId);
-      if (!updated) {
+      const transition = await cancelPendingChallenge(challengeId, userId);
+      if (!transition) {
         throw new HttpError("Ce défi n'est plus en attente.", 409, false);
       }
+      NotificationService.publishMany(transition.notifications);
       const games = await findGamesByChallenge(challengeId, 1);
       const game = games[0];
       if (!game) throw new HttpError("Partie associée au défi introuvable.", 500, false);
-      if (challenge.invitedUserId !== null) {
-        await NotificationService.notifyChallengeClosed(
-          challenge.invitedUserId,
-          challengeId,
-          game.id,
-          "cancelled",
-        );
-      }
       publishGameBroadcast({
         type: "updated",
         gameId: game.id,
         action: GAME_ACTIONS.CHALLENGE_CANCELLED,
-        result: { challenge: updated, game },
+        result: { challenge: transition.challenge, game },
       });
-      return updated;
+      return transition.challenge;
     } catch (error) {
       rethrowServiceError(error, "Erreur lors de l'annulation du défi :");
     }
+  }
+
+  static async expireChallenge(challengeId: number) {
+    return expireChallengeAndNotify(challengeId);
+  }
+
+  static async expireDueChallenges(limit = 100) {
+    const transitions = await expireDuePendingChallenges(limit);
+    for (const transition of transitions) {
+      publishChallengeExpiration(transition);
+    }
+    return transitions.length;
   }
 }

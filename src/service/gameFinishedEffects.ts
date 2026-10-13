@@ -143,18 +143,24 @@ async function emitGameFinishedNotifications(
 ): Promise<NotificationBroadcast[]> {
   const notifications: NotificationBroadcast[] = [];
   const players = participants.filter((participant) =>
-    participant.participantType === "USER" && participant.userId !== null,
+    (participant.participantType === "USER" && participant.userId !== null) ||
+      (participant.participantType === "GUEST" && participant.userId === null),
   );
   if (players.length < 2) {
     return notifications;
   }
 
   for (const participant of players) {
-    const userId = participant.userId;
-    if (userId === null) continue;
-    const existingNotifications = await tx.orm.public.Notification
-      .where({ userId, type: "GAME_FINISHED" })
-      .all();
+    const recipient = participant.userId !== null
+      ? { userId: participant.userId }
+      : { guestParticipantId: participant.id };
+    const existingNotifications = participant.userId !== null
+      ? await tx.orm.public.Notification
+        .where({ userId: participant.userId, type: "GAME_FINISHED" })
+        .all()
+      : await tx.orm.public.GuestNotification
+        .where({ guestParticipantId: participant.id, type: "GAME_FINISHED" })
+        .all();
     const alreadyNotified = existingNotifications.some((notification) => {
       const data = notification.data;
       return typeof data === "object" && data !== null && "gameId" in data &&
@@ -163,7 +169,8 @@ async function emitGameFinishedNotifications(
     if (alreadyNotified) continue;
 
     const opponent = players.find((candidate) =>
-      candidate.id !== participant.id && candidate.userId !== null && candidate.userId !== userId,
+      candidate.id !== participant.id &&
+      (candidate.userId === null || candidate.userId !== participant.userId),
     );
     const opponentName = opponent?.displayName ?? "votre adversaire";
     const content = game.result === "DRAW"
@@ -171,7 +178,7 @@ async function emitGameFinishedNotifications(
       : `La partie contre ${opponentName} est terminée : ${game.result === "WHITE_WIN" && participant.color === "WHITE" || game.result === "BLACK_WIN" && participant.color === "BLACK" ? "victoire" : "défaite"}.`;
     notifications.push(await NotificationService.createInTransaction(
       tx,
-      userId,
+      recipient,
       "GAME_FINISHED",
       "Partie terminée",
       content,
@@ -186,12 +193,58 @@ async function emitGameFinishedNotifications(
 }
 
 async function recordFinishedGameStatistics(
-  _tx: Transaction,
-  _game: FinishedGameRecord,
-  _participants: FinishedGameParticipant[],
+  tx: Transaction,
+  game: FinishedGameRecord,
+  participants: FinishedGameParticipant[],
 ) {
-  // The current backend does not expose a dedicated stats aggregate model yet,
-  // so this hook remains intentionally lightweight until the stats layer exists.
+  if (game.status !== "FINISHED" || !game.result) return;
+
+  const recordedUsers = new Set<number>();
+  for (const participant of participants) {
+    if (
+      participant.participantType !== "USER" ||
+      participant.userId === null ||
+      recordedUsers.has(participant.userId)
+    ) {
+      continue;
+    }
+    recordedUsers.add(participant.userId);
+
+    const outcome = game.result === "DRAW"
+      ? "DRAW"
+      : (game.result === "WHITE_WIN") === (participant.color === "WHITE")
+        ? "WIN"
+        : "LOSS";
+    const ledgerInsert = db.raw.sql`
+      INSERT INTO "public"."GamePlayerStatistic"
+        ("gameId", "userId", "color", "outcome", "gameType")
+      VALUES
+        (${game.id}, ${participant.userId}, ${participant.color}, ${outcome}, ${game.type})
+      ON CONFLICT ("gameId", "userId") DO NOTHING
+    `.affectedCount().build();
+    const { affectedRows } = await tx.execute(ledgerInsert);
+    if (affectedRows === 0) continue;
+
+    const aggregateUpsert = db.raw.sql`
+      INSERT INTO "public"."UserStatistics"
+        ("userId", "gamesPlayed", "wins", "losses", "draws", "updatedAt")
+      VALUES (
+        ${participant.userId},
+        1,
+        ${outcome === "WIN" ? 1 : 0},
+        ${outcome === "LOSS" ? 1 : 0},
+        ${outcome === "DRAW" ? 1 : 0},
+        NOW()
+      )
+      ON CONFLICT ("userId") DO UPDATE SET
+        "gamesPlayed" = "UserStatistics"."gamesPlayed" + 1,
+        "wins" = "UserStatistics"."wins" + EXCLUDED."wins",
+        "losses" = "UserStatistics"."losses" + EXCLUDED."losses",
+        "draws" = "UserStatistics"."draws" + EXCLUDED."draws",
+        "updatedAt" = NOW()
+    `.affectedCount().build();
+    await tx.execute(aggregateUpsert);
+  }
 }
 
 export async function finalizeGameFinishedEffects(

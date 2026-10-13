@@ -15,6 +15,7 @@ import usersRouter from "./routes/users";
 import { errorHandler } from "./middlewares/error.middleware";
 import { authApiRateLimit } from "./middlewares/auth-rate-limit.middleware";
 import { attachGameGateway } from "./websocket/game.gateway";
+import { startChallengeExpirationWorker } from "./service/challengeExpirationWorker";
 
 const port = Number(process.env.PORT ?? 3000);
 
@@ -39,6 +40,8 @@ async function startServer() {
     process.exit(1);
     return;
   }
+
+  startChallengeExpirationWorker();
 
   const app = express();
   app.disable("x-powered-by");

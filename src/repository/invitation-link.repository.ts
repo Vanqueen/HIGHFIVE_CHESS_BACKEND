@@ -1,4 +1,10 @@
 import { db } from "../prisma/db.ts";
+import { createNotificationInTransaction } from "./notification.repository";
+
+function epochMilliseconds(value: Date) {
+  const temporalValue = Reflect.get(value, "epochMilliseconds");
+  return typeof temporalValue === "number" ? temporalValue : value.getTime();
+}
 
 type CreateInvitationLinkData = Parameters<typeof db.orm.public.InvitationLink.create>[0];
 
@@ -79,7 +85,10 @@ export async function redeemChallengeInvitationLink(
 ) {
   return db.transaction(async (tx) => {
     const now = new Date();
-    if (linkExpiresAt && linkExpiresAt <= now || challengeExpiresAt <= now) return null;
+    if (
+      linkExpiresAt && epochMilliseconds(linkExpiresAt) <= now.getTime() ||
+      epochMilliseconds(challengeExpiresAt) <= now.getTime()
+    ) return null;
 
     // The conditional update makes a challenge link single-use even under concurrent requests.
     const consumed = await tx.orm.public.InvitationLink
@@ -125,7 +134,29 @@ export async function redeemChallengeInvitationLink(
       .where({ challengeId, status: "ACTIVE" })
       .update({ status: "DISABLED" });
 
-    return { challenge: accepted, game, participant };
+    const notifications = [
+      await createNotificationInTransaction(
+        tx,
+        { userId: creatorId },
+        "CHALLENGE_ACCEPTED",
+        "Défi accepté",
+        invitedUserId === null
+          ? "Un invité a accepté votre défi."
+          : "Votre adversaire a accepté votre défi.",
+        { challengeId, gameId: game.id },
+      ),
+    ];
+    if (invitedUserId === null) {
+      notifications.push(await createNotificationInTransaction(
+        tx,
+        { guestParticipantId: participant.id },
+        "CHALLENGE_ACCEPTED",
+        "Défi accepté",
+        "Vous avez accepté ce défi.",
+        { challengeId, gameId: game.id },
+      ));
+    }
+    return { challenge: accepted, game, participant, notifications };
   });
 }
 

@@ -7,6 +7,7 @@ const usersRouter = Router();
 usersRouter.use(authenticate);
 
 usersRouter.get("/", requireRole("ADMIN"), UserController.getAllUsers);
+usersRouter.get("/me/statistics", UserController.getMyStatistics);
 usersRouter.get("/me", authenticate, async (req, res) => {
   try {
     const authenticatedReq = req as typeof req & { user: unknown };

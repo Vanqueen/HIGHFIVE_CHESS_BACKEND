@@ -40,6 +40,14 @@
       "model": "GameParticipant",
       "namespace": "public"
     },
+    "GamePlayerStatistic": {
+      "model": "GamePlayerStatistic",
+      "namespace": "public"
+    },
+    "GuestNotification": {
+      "model": "GuestNotification",
+      "namespace": "public"
+    },
     "InvitationLink": {
       "model": "InvitationLink",
       "namespace": "public"
@@ -98,6 +106,10 @@
     },
     "UserAchievement": {
       "model": "UserAchievement",
+      "namespace": "public"
+    },
+    "UserStatistics": {
+      "model": "UserStatistics",
       "namespace": "public"
     }
   },
@@ -450,6 +462,23 @@
               {
                 "name": "AI",
                 "value": "AI"
+              }
+            ]
+          },
+          "PlayerGameOutcome": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "WIN",
+                "value": "WIN"
+              },
+              {
+                "name": "LOSS",
+                "value": "LOSS"
+              },
+              {
+                "name": "DRAW",
+                "value": "DRAW"
               }
             ]
           },
@@ -1766,6 +1795,21 @@
                   "namespace": "public"
                 }
               },
+              "playerStatistics": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "gameId"
+                  ]
+                },
+                "to": {
+                  "model": "GamePlayerStatistic",
+                  "namespace": "public"
+                }
+              },
               "ratingHistories": {
                 "cardinality": "1:N",
                 "on": {
@@ -2160,6 +2204,21 @@
                   "namespace": "public"
                 }
               },
+              "guestNotifications": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "guestParticipantId"
+                  ]
+                },
+                "to": {
+                  "model": "GuestNotification",
+                  "namespace": "public"
+                }
+              },
               "moves": {
                 "cardinality": "1:N",
                 "on": {
@@ -2255,6 +2314,262 @@
               },
               "namespaceId": "public",
               "table": "GameParticipant"
+            }
+          },
+          "GamePlayerStatistic": {
+            "fields": {
+              "color": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "Color",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "gameId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "gameType": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "GameType",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "outcome": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "PlayerGameOutcome",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "game": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "gameId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Game",
+                  "namespace": "public"
+                }
+              },
+              "user": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "color": {
+                  "column": "color"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "gameId": {
+                  "column": "gameId"
+                },
+                "gameType": {
+                  "column": "gameType"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "outcome": {
+                  "column": "outcome"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "public",
+              "table": "GamePlayerStatistic"
+            }
+          },
+          "GuestNotification": {
+            "fields": {
+              "content": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "data": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/json@1",
+                  "kind": "scalar"
+                }
+              },
+              "expiresAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "guestParticipantId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "readAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "type": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "NotificationType",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              }
+            },
+            "relations": {
+              "guestParticipant": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "guestParticipantId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "GameParticipant",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "content": {
+                  "column": "content"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "data": {
+                  "column": "data"
+                },
+                "expiresAt": {
+                  "column": "expiresAt"
+                },
+                "guestParticipantId": {
+                  "column": "guestParticipantId"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "readAt": {
+                  "column": "readAt"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "type": {
+                  "column": "type"
+                }
+              },
+              "namespaceId": "public",
+              "table": "GuestNotification"
             }
           },
           "InvitationLink": {
@@ -4661,6 +4976,21 @@
                   "namespace": "public"
                 }
               },
+              "gameStatistics": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "GamePlayerStatistic",
+                  "namespace": "public"
+                }
+              },
               "invitationLinksCreated": {
                 "cardinality": "1:N",
                 "on": {
@@ -4808,6 +5138,22 @@
                 },
                 "to": {
                   "model": "Session",
+                  "namespace": "public"
+                }
+              },
+              "statistics": {
+                "cardinality": "1:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "UserStatistics",
                   "namespace": "public"
                 }
               },
@@ -5015,6 +5361,94 @@
               },
               "namespaceId": "public",
               "table": "UserAchievement"
+            }
+          },
+          "UserStatistics": {
+            "fields": {
+              "draws": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "gamesPlayed": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "losses": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "wins": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "draws": {
+                  "column": "draws"
+                },
+                "gamesPlayed": {
+                  "column": "gamesPlayed"
+                },
+                "losses": {
+                  "column": "losses"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                },
+                "userId": {
+                  "column": "userId"
+                },
+                "wins": {
+                  "column": "wins"
+                }
+              },
+              "namespaceId": "public",
+              "table": "UserStatistics"
             }
           }
         }
@@ -6381,6 +6815,301 @@
                   ]
                 }
               ]
+            },
+            "GamePlayerStatistic": {
+              "checks": [
+                {
+                  "expression": "\"color\" IN ('WHITE', 'BLACK')",
+                  "name": "GamePlayerStatistic_color_check_1b276a2b",
+                  "prefix": "GamePlayerStatistic_color_check"
+                },
+                {
+                  "expression": "\"gameType\" IN ('LOCAL', 'ONLINE', 'AI', 'CHALLENGE', 'TOURNAMENT')",
+                  "name": "GamePlayerStatistic_gameType_check_603adf18",
+                  "prefix": "GamePlayerStatistic_gameType_check"
+                },
+                {
+                  "expression": "\"outcome\" IN ('WIN', 'LOSS', 'DRAW')",
+                  "name": "GamePlayerStatistic_outcome_check_badde9c1",
+                  "prefix": "GamePlayerStatistic_outcome_check"
+                }
+              ],
+              "columns": {
+                "color": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Color",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "gameId": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "gameType": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "GameType",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "outcome": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "PlayerGameOutcome",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "userId": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "gameId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "GamePlayerStatistic"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Game"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "GamePlayerStatistic"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "User"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "gameId"
+                  ],
+                  "name": "GamePlayerStatistic_gameId_idx_6cdb47f8",
+                  "prefix": "GamePlayerStatistic_gameId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId",
+                    "createdAt"
+                  ],
+                  "name": "GamePlayerStatistic_userId_createdAt_idx_f726f04a",
+                  "prefix": "GamePlayerStatistic_userId_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "GamePlayerStatistic_userId_idx_a489d58a",
+                  "prefix": "GamePlayerStatistic_userId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "gameId",
+                    "userId"
+                  ]
+                }
+              ]
+            },
+            "GuestNotification": {
+              "checks": [
+                {
+                  "expression": "\"type\" IN ('FRIEND_REQUEST', 'FRIEND_REQUEST_ACCEPTED', 'CHALLENGE_RECEIVED', 'CHALLENGE_ACCEPTED', 'GAME_STARTED', 'GAME_FINISHED', 'GAME_YOUR_TURN', 'TOURNAMENT_INVITATION', 'TOURNAMENT_STARTED', 'TOURNAMENT_ROUND_STARTED', 'TOURNAMENT_ROUND_FINISHED', 'SYSTEM')",
+                  "name": "GuestNotification_type_check_dbad3a07",
+                  "prefix": "GuestNotification_type_check"
+                }
+              ],
+              "columns": {
+                "content": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "data": {
+                  "codecId": "pg/json@1",
+                  "nativeType": "json",
+                  "nullable": true
+                },
+                "expiresAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "guestParticipantId": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "readAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "type": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "NotificationType",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "guestParticipantId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "GuestNotification"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "GameParticipant"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "createdAt"
+                  ],
+                  "name": "GuestNotification_createdAt_idx_9575dbd7",
+                  "prefix": "GuestNotification_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "expiresAt"
+                  ],
+                  "name": "GuestNotification_expiresAt_idx_6b6b8c10",
+                  "prefix": "GuestNotification_expiresAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "guestParticipantId"
+                  ],
+                  "name": "GuestNotification_guestParticipantId_idx_9a282615",
+                  "prefix": "GuestNotification_guestParticipantId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "readAt"
+                  ],
+                  "name": "GuestNotification_readAt_idx_1b4c936e",
+                  "prefix": "GuestNotification_readAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "type"
+                  ],
+                  "name": "GuestNotification_type_idx_b6b604ea",
+                  "prefix": "GuestNotification_type_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
             },
             "InvitationLink": {
               "checks": [
@@ -8698,6 +9427,86 @@
                   ]
                 }
               ]
+            },
+            "UserStatistics": {
+              "columns": {
+                "draws": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "gamesPlayed": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "losses": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "wins": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "UserStatistics"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "User"
+                  }
+                }
+              ],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "userId"
+                ]
+              },
+              "uniques": []
             }
           },
           "valueSet": {
@@ -8848,6 +9657,14 @@
                 "AI"
               ]
             },
+            "PlayerGameOutcome": {
+              "kind": "valueSet",
+              "values": [
+                "WIN",
+                "LOSS",
+                "DRAW"
+              ]
+            },
             "PromotionPiece": {
               "kind": "valueSet",
               "values": [
@@ -8961,7 +9778,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "b7818c5d354030fc918c504f733cce7cbc969eaf233af50a374c0f84dec04d12"
+    "storageHash": "d15ebefa65df50f0887536ca861fb7bcc242b99e287b350046dd307917370709"
   },
   "execution": {
     "executionHash": "d8c34a0b049a76c1f6f5a055b8d3ffcd114c2ca9483e661f21e49c9bf679b51b",

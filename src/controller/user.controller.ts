@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 import type { UploadedFile } from "express-fileupload";
 import { UserService } from "../service/userService";
+import { StatisticsService } from "../service/statisticsService";
 import {
   readBody,
   readParamId,
@@ -23,6 +24,11 @@ export const UserController = {
       return;
     }
     response.status(200).json(await UserService.getUserById(userId));
+  }) satisfies RequestHandler,
+
+  getMyStatistics: (async (_request, response) => {
+    const user = requireCurrentUser(response);
+    response.status(200).json(await StatisticsService.getForUser(user.id));
   }) satisfies RequestHandler,
 
   changeUserRole: (async (request, response) => {

@@ -1,34 +1,30 @@
 import { publishNotification } from "../events/notification.broadcast";
 import type { NotificationBroadcast } from "../events/notification.broadcast";
 import { db } from "../prisma/db.ts";
-import { createNotification, findNotificationsForUser } from "../repository/notification.repository";
+import {
+  createNotification,
+  createNotificationInTransaction,
+  findNotificationsForGuest,
+  findNotificationsForUser,
+} from "../repository/notification.repository";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-type NotificationType =
-  | "CHALLENGE_RECEIVED"
-  | "CHALLENGE_ACCEPTED"
-  | "GAME_STARTED"
-  | "GAME_FINISHED"
-  | "GAME_YOUR_TURN"
-  | "SYSTEM";
+type NotificationType = Parameters<typeof db.orm.public.Notification.create>[0]["type"];
+type NotificationRecipient =
+  | { userId: number; guestParticipantId?: never }
+  | { userId?: never; guestParticipantId: number };
 
 export class NotificationService {
   static createInTransaction(
     tx: Transaction,
-    userId: number,
+    recipient: NotificationRecipient,
     type: NotificationType,
     title: string,
     content: string,
     data: Record<string, number | string>,
   ) {
-    return tx.orm.public.Notification.create({
-      userId,
-      type,
-      title,
-      content,
-      data,
-    });
+    return createNotificationInTransaction(tx, recipient, type, title, content, data);
   }
 
   static publish(notification: NotificationBroadcast) {
@@ -49,7 +45,7 @@ export class NotificationService {
       content,
       data,
     });
-    this.publish(notification);
+    this.publish({ ...notification, guestParticipantId: null });
     return notification;
   }
 
@@ -105,5 +101,13 @@ export class NotificationService {
 
   static async getForUser(userId: number, limit = 50) {
     return findNotificationsForUser(userId, limit);
+  }
+
+  static async getForGuest(guestParticipantId: number, limit = 50) {
+    return findNotificationsForGuest(guestParticipantId, limit);
+  }
+
+  static publishMany(notifications: NotificationBroadcast[]) {
+    for (const notification of notifications) this.publish(notification);
   }
 }

@@ -8,9 +8,10 @@ import {
   findInvitationLinkByTokenHash,
   redeemChallengeInvitationLink,
 } from "../repository/invitation-link.repository";
-import { expirePendingChallenge, findChallenge } from "../repository/challenge.repository";
+import { findChallenge } from "../repository/challenge.repository";
 import { findUser } from "../repository/user.repository";
 import { signGuestGameToken } from "../utils/guestGameToken";
+import { expireChallengeAndNotify } from "./challengeExpirationService";
 import { NotificationService } from "./notificationService";
 import { publishGameBroadcast } from "../events/game.broadcast";
 import { GAME_ACTIONS } from "../events/game.events";
@@ -26,6 +27,11 @@ function hashInvitationToken(token: string) {
 function withoutTokenHash<T extends { tokenHash: string }>(link: T) {
   const { tokenHash: _tokenHash, ...publicLink } = link;
   return publicLink;
+}
+
+function epochMilliseconds(value: Date) {
+  const temporalValue = Reflect.get(value, "epochMilliseconds");
+  return typeof temporalValue === "number" ? temporalValue : value.getTime();
 }
 
 export class InvitationLinkService {
@@ -50,14 +56,14 @@ export class InvitationLinkService {
       if (challenge.status !== "PENDING") {
         throw new HttpError("Le défi n'est plus en attente.", 409, false);
       }
-      if (challenge.expiresAt <= new Date()) {
-        await expirePendingChallenge(challengeId);
+      if (epochMilliseconds(challenge.expiresAt) <= Date.now()) {
+        await expireChallengeAndNotify(challengeId);
         throw new HttpError("Le défi a expiré.", 410, false);
       }
 
       const token = randomBytes(32).toString("base64url");
       const requestedExpiry = new Date(Date.now() + expiresInMinutes * 60_000);
-      const expiresAt = requestedExpiry < challenge.expiresAt
+      const expiresAt = requestedExpiry.getTime() < epochMilliseconds(challenge.expiresAt)
         ? requestedExpiry
         : challenge.expiresAt;
       // The raw token is returned once; only its digest is persisted.
@@ -81,14 +87,21 @@ export class InvitationLinkService {
       if (challenge.creatorId !== creatorId) {
         throw new HttpError("Seul le créateur peut consulter ces liens.", 403, false);
       }
-      if (challenge.status === "PENDING" && challenge.expiresAt <= new Date()) {
-        await expirePendingChallenge(challengeId);
+      if (
+        challenge.status === "PENDING" &&
+        epochMilliseconds(challenge.expiresAt) <= Date.now()
+      ) {
+        await expireChallengeAndNotify(challengeId);
       }
 
       const links = await findChallengeInvitationLinks(challengeId, creatorId);
       const now = new Date();
       return Promise.all(links.map(async (link) => {
-        if (link.status === "ACTIVE" && link.expiresAt && link.expiresAt <= now) {
+        if (
+          link.status === "ACTIVE" &&
+          link.expiresAt &&
+          epochMilliseconds(link.expiresAt) <= now.getTime()
+        ) {
           await expireInvitationLink(link.id);
           return { ...withoutTokenHash(link), status: "EXPIRED" as const };
         }
@@ -129,7 +142,7 @@ export class InvitationLinkService {
       if (link.status !== "ACTIVE" || link.currentUses >= (link.maxUses ?? 0)) {
         throw new HttpError("Ce lien a déjà été utilisé ou désactivé.", 410, false);
       }
-      if (link.expiresAt && link.expiresAt <= new Date()) {
+      if (link.expiresAt && epochMilliseconds(link.expiresAt) <= Date.now()) {
         await expireInvitationLink(link.id);
         throw new HttpError("Ce lien d'invitation a expiré.", 410, false);
       }
@@ -141,9 +154,11 @@ export class InvitationLinkService {
       if (!challenge) throw new HttpError("Le défi associé n'existe plus.", 410, false);
       if (
         challenge.status !== "PENDING" ||
-        challenge.expiresAt <= new Date()
+        epochMilliseconds(challenge.expiresAt) <= Date.now()
       ) {
-        if (challenge.status === "PENDING") await expirePendingChallenge(challenge.id);
+        if (challenge.status === "PENDING") {
+          await expireChallengeAndNotify(challenge.id);
+        }
         throw new HttpError("Le défi associé n'est plus disponible.", 410, false);
       }
       if (userId !== null && challenge.creatorId === userId) {
@@ -170,12 +185,7 @@ export class InvitationLinkService {
         challenge.expiresAt,
       );
       if (!accepted) throw new HttpError("Ce lien ou ce défi n'est plus disponible.", 409, false);
-      await NotificationService.notifyChallengeAccepted(
-        challenge.creatorId,
-        challenge.id,
-        accepted.game.id,
-        userId === null ? "Un invité" : "Votre adversaire",
-      );
+      NotificationService.publishMany(accepted.notifications);
       publishGameBroadcast({
         type: "updated",
         gameId: accepted.game.id,
@@ -183,7 +193,9 @@ export class InvitationLinkService {
         result: { challenge: accepted.challenge, game: accepted.game },
       });
       return {
-        ...accepted,
+        challenge: accepted.challenge,
+        game: accepted.game,
+        participant: accepted.participant,
         ...(userId === null
           ? {
               guestSessionToken: signGuestGameToken({

@@ -2,7 +2,8 @@ import { EventEmitter } from "node:events";
 
 export interface NotificationBroadcast {
   id: number;
-  userId: number;
+  userId: number | null;
+  guestParticipantId: number | null;
   type: string;
   title: string;
   content: string;

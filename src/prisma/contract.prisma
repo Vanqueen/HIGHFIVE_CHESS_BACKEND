@@ -57,6 +57,12 @@ enum GameResult {
   DRAW
 }
 
+enum PlayerGameOutcome {
+  WIN
+  LOSS
+  DRAW
+}
+
 enum TerminationReason {
   CHECKMATE
   TIMEOUT
@@ -232,6 +238,8 @@ model User {
   ratings             Rating[]
   achievements        UserAchievement[]
   notifications       Notification[]
+  statistics          UserStatistics?
+  gameStatistics      GamePlayerStatistic[]
 
   reportsCreated      Report[] @relation("ReportReporter")
   reportsReceived     Report[] @relation("ReportReportedUser")
@@ -379,6 +387,7 @@ model Game {
   analyses              GameAnalysis[]
   participants          GameParticipant[] @relation("GameParticipants")
   ratingHistories       RatingHistory[]
+  playerStatistics      GamePlayerStatistic[]
   tournamentRound       TournamentRound? @relation(fields: [tournamentRoundId], references: [id], onDelete: SetNull)
   challenge             Challenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
   reports               Report[]
@@ -408,11 +417,39 @@ model GameParticipant {
   user                  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
   tournamentParticipant TournamentParticipant? @relation(fields: [tournamentParticipantId], references: [id], onDelete: SetNull)
   moves Move[]
+  guestNotifications GuestNotification[]
 
   @@unique([gameId, color])
   @@index([gameId])
   @@index([userId])
   @@index([tournamentParticipantId])
+}
+
+model UserStatistics {
+  userId       Int      @id
+  gamesPlayed  Int      @default(0)
+  wins         Int      @default(0)
+  losses       Int      @default(0)
+  draws        Int      @default(0)
+  updatedAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GamePlayerStatistic {
+  id         Int               @id @default(autoincrement())
+  gameId     Int
+  userId     Int
+  color      Color
+  outcome    PlayerGameOutcome
+  gameType   GameType
+  createdAt  DateTime          @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, userId])
+  @@index([userId, createdAt])
 }
 
 model Move {
@@ -654,6 +691,26 @@ model Notification {
   @@index([expiresAt])
 
   user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GuestNotification {
+  id                 Int              @id @default(autoincrement())
+  guestParticipantId Int
+  type               NotificationType
+  title              String
+  content            String
+  data               Json?
+  readAt             DateTime?
+  createdAt          DateTime         @default(now())
+  expiresAt          DateTime?
+
+  @@index([guestParticipantId])
+  @@index([type])
+  @@index([readAt])
+  @@index([createdAt])
+  @@index([expiresAt])
+
+  guestParticipant GameParticipant @relation(fields: [guestParticipantId], references: [id], onDelete: Cascade)
 }
 
 model Report {

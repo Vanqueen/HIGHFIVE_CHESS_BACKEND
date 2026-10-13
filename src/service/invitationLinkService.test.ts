@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   findInvitationLinkByTokenHash: vi.fn(),
   findUser: vi.fn(),
   redeemChallengeInvitationLink: vi.fn(),
-  notifyChallengeAccepted: vi.fn(),
+  publishMany: vi.fn(),
   publishGameBroadcast: vi.fn(),
   signGuestGameToken: vi.fn(),
 }));
@@ -34,7 +34,7 @@ vi.mock("../repository/user.repository", () => ({
   findUser: mocks.findUser,
 }));
 vi.mock("./notificationService", () => ({
-  NotificationService: { notifyChallengeAccepted: mocks.notifyChallengeAccepted },
+  NotificationService: { publishMany: mocks.publishMany },
 }));
 vi.mock("../events/game.broadcast", () => ({
   publishGameBroadcast: mocks.publishGameBroadcast,
@@ -119,6 +119,7 @@ describe("InvitationLinkService", () => {
       challenge: { id: 11, status: "ACCEPTED" },
       game: { id: 21 },
       participant: { id: 31 },
+      notifications: [],
     });
 
     await expect(InvitationLinkService.redeemChallengeLink(rawToken, 7))
@@ -144,6 +145,7 @@ describe("InvitationLinkService", () => {
       challenge: { id: 11, status: "ACCEPTED" },
       game: { id: 21 },
       participant: { id: 31 },
+      notifications: [],
     });
     mocks.signGuestGameToken.mockReturnValue("guest-session-token");
 

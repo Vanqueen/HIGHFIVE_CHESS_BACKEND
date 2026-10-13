@@ -12,10 +12,8 @@ const mocks = vi.hoisted(() => ({
   findChallengesByInvitee: vi.fn(),
   findGamesByChallenge: vi.fn(),
   findUser: vi.fn(),
-  notifyChallengeAccepted: vi.fn(),
-  notifyChallengeClosed: vi.fn(),
-  notifyChallengeReceived: vi.fn(),
   publishGameBroadcast: vi.fn(),
+  publishMany: vi.fn(),
 }));
 
 vi.mock("../repository/challenge.repository", () => ({
@@ -36,9 +34,7 @@ vi.mock("../repository/game.repository", () => ({
 }));
 vi.mock("./notificationService", () => ({
   NotificationService: {
-    notifyChallengeAccepted: mocks.notifyChallengeAccepted,
-    notifyChallengeClosed: mocks.notifyChallengeClosed,
-    notifyChallengeReceived: mocks.notifyChallengeReceived,
+    publishMany: mocks.publishMany,
   },
 }));
 vi.mock("../events/game.broadcast", () => ({
@@ -48,6 +44,7 @@ vi.mock("../events/game.broadcast", () => ({
 import { ChallengeService } from "./challengeService";
 
 const activeUser = {
+  username: "test-user",
   accountStatus: "ACTIVE",
   deletedAt: null,
 };
@@ -61,6 +58,7 @@ describe("ChallengeService", () => {
       challenge: { id: 10 },
       game: { id: 20 },
       participant: { id: 30 },
+      notifications: [],
     });
   });
 
@@ -79,6 +77,7 @@ describe("ChallengeService", () => {
       }),
       0,
       0,
+      "test-user",
     );
   });
 
@@ -92,6 +91,7 @@ describe("ChallengeService", () => {
       expect.objectContaining({ invitedUserId: null }),
       600,
       5,
+      "test-user",
     );
   });
 
@@ -138,6 +138,7 @@ describe("ChallengeService", () => {
       challenge: { id: 10, status: "ACCEPTED" },
       game: { id: 20, status: "WAITING", initialTimeSeconds: 600 },
       participant: { id: 30, color: "BLACK", userId: 8 },
+      notifications: [],
     });
 
     await expect(ChallengeService.acceptChallenge(10, 8)).resolves.toMatchObject({
@@ -159,11 +160,12 @@ describe("ChallengeService", () => {
     const updated = { ...challenge, status: "CANCELLED" };
     const game = { id: 20, status: "CANCELLED" };
     mocks.findChallenge.mockResolvedValue(challenge);
-    mocks.declinePendingChallenge.mockResolvedValue(updated);
+    const notifications = [{ id: 1, userId: 3, guestParticipantId: null }];
+    mocks.declinePendingChallenge.mockResolvedValue({ challenge: updated, notifications });
     mocks.findGamesByChallenge.mockResolvedValue([game]);
 
     await expect(ChallengeService.declineChallenge(10, 8)).resolves.toEqual(updated);
-    expect(mocks.notifyChallengeClosed).toHaveBeenCalledWith(3, 10, 20, "declined");
+    expect(mocks.publishMany).toHaveBeenCalledWith(notifications);
     expect(mocks.publishGameBroadcast).toHaveBeenCalledWith({
       type: "updated",
       gameId: 20,

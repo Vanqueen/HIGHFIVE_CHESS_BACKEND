@@ -6,6 +6,7 @@ import { publishGameBroadcast } from "../events/game.broadcast";
 import { GAME_ACTIONS, GAME_EVENTS } from "../events/game.events";
 import { GAME_CHAT_EVENTS } from "../events/gameChat.events";
 import { MOVE_EVENTS } from "../events/move.events";
+import { publishNotification } from "../events/notification.broadcast";
 
 const mocks = vi.hoisted(() => ({
   authenticateAccessToken: vi.fn(),
@@ -229,6 +230,25 @@ describe("game gateway integration", () => {
     expect(mocks.getMessages).not.toHaveBeenCalled();
     expect(mocks.setOnline).not.toHaveBeenCalled();
     expect(mocks.startWhenParticipantsReady).toHaveBeenCalledWith(41, 51, new Set([51]));
+
+    const guestNotification = new Promise<unknown>((resolve) => {
+      client?.once(CONNECTION_EVENTS.NOTIFICATION, resolve);
+    });
+    publishNotification({
+      id: 91,
+      userId: null,
+      guestParticipantId: 51,
+      type: "GAME_FINISHED",
+      title: "Partie terminée",
+      content: "La partie est terminée.",
+      data: { gameId: 41 },
+      createdAt: new Date(),
+    });
+    await expect(guestNotification).resolves.toMatchObject({
+      id: 91,
+      guestParticipantId: 51,
+      type: "GAME_FINISHED",
+    });
 
     const moveAcknowledgement = new Promise<{ success: boolean }>((resolve) => {
       client?.emit(MOVE_EVENTS.PLAY, { gameId: 41, from: "e2", to: "e4" }, resolve);

@@ -47,6 +47,7 @@ let resolveDrawOffer: typeof import("../repository/game-action.repository")["res
 let claimGameNoShow: typeof import("../repository/game-action.repository")["claimGameNoShow"];
 let moveService: typeof import("../service/moveService")["MoveService"];
 let finalizeGameFinishedEffects: typeof import("../service/gameFinishedEffects")["finalizeGameFinishedEffects"];
+let expireDueChallenges: typeof import("../service/challengeService")["ChallengeService"]["expireDueChallenges"];
 let registerTournamentUser: typeof import("../repository/tournament.repository")["registerTournamentUser"];
 let advanceTournamentRound: typeof import("../repository/tournament.repository")["advanceTournamentRound"];
 const createdGameIds: number[] = [];
@@ -205,6 +206,8 @@ describe.skipIf(!testDatabaseUrl)("PostgreSQL game-finished integration", () => 
       await import("../repository/game-action.repository"));
     ({ MoveService: moveService } = await import("../service/moveService"));
     ({ finalizeGameFinishedEffects } = await import("../service/gameFinishedEffects"));
+    ({ ChallengeService: { expireDueChallenges } } =
+      await import("../service/challengeService"));
     ({ registerTournamentUser, advanceTournamentRound } =
       await import("../repository/tournament.repository"));
   }, 30_000);
@@ -237,7 +240,7 @@ describe.skipIf(!testDatabaseUrl)("PostgreSQL game-finished integration", () => 
 
   it("applies a rated resignation once and emits notifications once under concurrent finish attempts", async () => {
     const db = requireDatabase();
-    const { game, whiteUser, blackUser } = await createRatedGameFixture();
+    const { game, whiteUser, blackUser, white, black } = await createRatedGameFixture();
     const notifications: number[] = [];
     const unsubscribe = subscribeToNotifications((notification) => {
       if (notification.userId === whiteUser.id || notification.userId === blackUser.id) {
@@ -298,6 +301,41 @@ describe.skipIf(!testDatabaseUrl)("PostgreSQL game-finished integration", () => 
       expect(ratings.map((rating) => rating?.rating)).toEqual([1516, 1484]);
       expect(ratings.map((rating) => rating?.gamesPlayed)).toEqual([1, 1]);
 
+      const statistics = await Promise.all([
+        db.orm.public.UserStatistics.where({ userId: whiteUser.id }).first(),
+        db.orm.public.UserStatistics.where({ userId: blackUser.id }).first(),
+      ]);
+      expect(statistics.map((row) => row && ({
+        gamesPlayed: row.gamesPlayed,
+        wins: row.wins,
+        losses: row.losses,
+        draws: row.draws,
+      }))).toEqual([
+        { gamesPlayed: 1, wins: 1, losses: 0, draws: 0 },
+        { gamesPlayed: 1, wins: 0, losses: 1, draws: 0 },
+      ]);
+      expect(await db.orm.public.GamePlayerStatistic.where({ gameId: game.id }).all())
+        .toHaveLength(2);
+
+      await db.transaction((tx) => finalizeGameFinishedEffects(tx, {
+        id: game.id,
+        type: "ONLINE",
+        status: "FINISHED",
+        isRated: true,
+        ratingCategory: "BLITZ",
+        result: "WHITE_WIN",
+        tournamentRoundId: null,
+      }, [
+        { id: white.id, gameId: game.id, color: "WHITE", participantType: "USER", userId: whiteUser.id },
+        { id: black.id, gameId: game.id, color: "BLACK", participantType: "USER", userId: blackUser.id },
+      ]));
+      expect((await Promise.all([
+        db.orm.public.UserStatistics.where({ userId: whiteUser.id }).first(),
+        db.orm.public.UserStatistics.where({ userId: blackUser.id }).first(),
+      ])).map((row) => row?.gamesPlayed)).toEqual([1, 1]);
+      expect(await db.orm.public.GamePlayerStatistic.where({ gameId: game.id }).all())
+        .toHaveLength(2);
+
       const persistedNotifications = await Promise.all([
         db.orm.public.Notification.where({ userId: whiteUser.id }).all(),
         db.orm.public.Notification.where({ userId: blackUser.id }).all(),
@@ -357,6 +395,103 @@ describe.skipIf(!testDatabaseUrl)("PostgreSQL game-finished integration", () => 
     expect(notifications.map((rows) => rows.filter((row) =>
       row.type === "GAME_FINISHED"
     ).length)).toEqual([1, 1]);
+  }, 30_000);
+
+  it("persists game-finished notifications for guests and exposes them by participant", async () => {
+    const db = requireDatabase();
+    const { game, whiteUser, black } = await createRatedGameFixture();
+    await db.orm.public.GameParticipant.where({ id: black.id }).delete();
+    const guest = await db.orm.public.GameParticipant.create({
+      gameId: game.id,
+      participantType: "GUEST",
+      color: "BLACK",
+      userId: null,
+      tournamentParticipantId: null,
+      displayName: "Invité noir",
+    });
+
+    const guestBroadcasts: number[] = [];
+    const unsubscribe = subscribeToNotifications((notification) => {
+      if (notification.guestParticipantId !== null) {
+        guestBroadcasts.push(notification.guestParticipantId);
+      }
+    });
+    try {
+      await finishGame(game.id, {
+        result: "WHITE_WIN",
+        terminationReason: "RESIGNATION",
+        whiteTimeRemainingMs: 300_000n,
+        blackTimeRemainingMs: 300_000n,
+      });
+
+      const { NotificationService } = await import("../service/notificationService");
+      const guestNotifications = await NotificationService.getForGuest(guest.id);
+      expect(guestNotifications).toMatchObject([
+        {
+          guestParticipantId: guest.id,
+          type: "GAME_FINISHED",
+        },
+      ]);
+      expect(guestBroadcasts).toEqual([guest.id]);
+      expect(await db.orm.public.UserStatistics.where({ userId: whiteUser.id }).first())
+        .toMatchObject({ gamesPlayed: 1, wins: 1, losses: 0, draws: 0 });
+    } finally {
+      unsubscribe();
+    }
+  }, 30_000);
+
+  it("expires due challenges once and atomically persists notifications and game state", async () => {
+    const db = requireDatabase();
+    const { game, whiteUser, blackUser } = await createRatedGameFixture();
+    const challenge = await db.orm.public.Challenge.create({
+      creatorId: whiteUser.id,
+      invitedUserId: blackUser.id,
+      status: "PENDING",
+      expiresAt: Temporal.Instant.fromEpochMilliseconds(
+        Temporal.Now.instant().epochMilliseconds - 60_000,
+      ),
+    });
+    await db.orm.public.Game.where({ id: game.id }).update({
+      type: "CHALLENGE",
+      status: "WAITING",
+      isRated: false,
+      ratingCategory: null,
+      activeColor: null,
+      clockStartedAt: null,
+      startedAt: null,
+      challengeId: challenge.id,
+    });
+
+    const broadcasts: number[] = [];
+    const unsubscribe = subscribeToNotifications((notification) => {
+      if (notification.userId !== null) broadcasts.push(notification.userId);
+    });
+    try {
+      const expirationCounts = await Promise.all([
+        expireDueChallenges(),
+        expireDueChallenges(),
+      ]);
+      expect(expirationCounts.reduce((sum, count) => sum + count, 0)).toBe(1);
+      expect(await db.orm.public.Challenge.where({ id: challenge.id }).first())
+        .toMatchObject({ status: "EXPIRED" });
+      expect(await db.orm.public.Game.where({ id: game.id }).first())
+        .toMatchObject({ status: "CANCELLED", terminationReason: "CANCELLED" });
+
+      const persisted = await Promise.all([
+        db.orm.public.Notification.where({
+          userId: whiteUser.id,
+          type: "SYSTEM",
+        }).all(),
+        db.orm.public.Notification.where({
+          userId: blackUser.id,
+          type: "SYSTEM",
+        }).all(),
+      ]);
+      expect(persisted.map((rows) => rows.length)).toEqual([1, 1]);
+      expect(broadcasts.sort()).toEqual([whiteUser.id, blackUser.id].sort());
+    } finally {
+      unsubscribe();
+    }
   }, 30_000);
 
   it("finishes a tournament no-show once and excludes it from ratings", async () => {
@@ -528,6 +663,12 @@ describe.skipIf(!testDatabaseUrl)("PostgreSQL game-finished integration", () => 
       db.orm.public.Notification.where({ userId: blackUser.id }).all(),
     ]);
     expect(rows.map((result) => result.length)).toEqual([0, 0, 0, 0]);
+    expect(await db.orm.public.UserStatistics.where({ userId: whiteUser.id }).first())
+      .toBeNull();
+    expect(await db.orm.public.UserStatistics.where({ userId: blackUser.id }).first())
+      .toBeNull();
+    expect(await db.orm.public.GamePlayerStatistic.where({ gameId: game.id }).all())
+      .toHaveLength(0);
   }, 30_000);
 
   it("enforces tournament capacity for concurrent registrations", async () => {

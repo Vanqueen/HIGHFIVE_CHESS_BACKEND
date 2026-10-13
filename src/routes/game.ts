@@ -13,6 +13,7 @@ gameRouter.post("/guest/:gameId/resign", GameController.resignAsGuest);
 gameRouter.post("/guest/:gameId/no-show", GameController.claimNoShowAsGuest);
 gameRouter.get("/guest/:gameId/moves", GameController.getGuestMoves);
 gameRouter.get("/guest/:gameId/messages", GameController.getGuestMessages);
+gameRouter.get("/guest/:gameId/notifications", GameController.getGuestNotifications);
 gameRouter.post("/guest/:gameId/messages", GameController.sendGuestMessage);
 gameRouter.use(authenticate);
 gameRouter.post("/", GameController.createGame);

@@ -9,6 +9,7 @@ import { GameChatService } from "../service/gameChatService";
 import { GAME_ACTIONS } from "../events/game.events";
 import { publishGameBroadcast } from "../events/game.broadcast";
 import { AnonymousGameService } from "../service/anonymousGameService";
+import { NotificationService } from "../service/notificationService";
 import HttpError from "../service/errorService";
 import { verifyGuestGameToken } from "../utils/guestGameToken";
 import {
@@ -198,6 +199,30 @@ export const GameController = {
     );
     response.status(200).json(serializeBigInts(
       await GameChatService.getMessagesForGuest(gameId, participantId),
+    ));
+  }) satisfies RequestHandler,
+
+  getGuestNotifications: (async (request, response) => {
+    const gameId = readParamId(request, "gameId");
+    const participantId = await requireGuestParticipantId(
+      request.headers.authorization,
+      gameId,
+    );
+    const rawLimit = request.query.limit;
+    let limit = 50;
+    if (rawLimit !== undefined) {
+      if (typeof rawLimit !== "string" || !/^[1-9]\d*$/.test(rawLimit)) {
+        response.status(422).json({ success: false, message: "Limite invalide." });
+        return;
+      }
+      limit = Number(rawLimit);
+      if (!Number.isSafeInteger(limit) || limit > 100) {
+        response.status(422).json({ success: false, message: "La limite maximale est 100." });
+        return;
+      }
+    }
+    response.status(200).json(serializeBigInts(
+      await NotificationService.getForGuest(participantId, limit),
     ));
   }) satisfies RequestHandler,
 

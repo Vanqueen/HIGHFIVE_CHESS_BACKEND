@@ -190,7 +190,14 @@ export function attachGameGateway(httpServer: HttpServer) {
   });
   io.once("close", unsubscribeBroadcasts);
   const unsubscribeNotifications = subscribeToNotifications((notification) => {
-    io.to(`user:${notification.userId}`).emit(CONNECTION_EVENTS.NOTIFICATION, serializePayload(notification));
+    const payload = serializePayload(notification);
+    if (notification.userId !== null) {
+      io.to(`user:${notification.userId}`).emit(CONNECTION_EVENTS.NOTIFICATION, payload);
+    }
+    if (notification.guestParticipantId !== null) {
+      io.to(`guest:${notification.guestParticipantId}`)
+        .emit(CONNECTION_EVENTS.NOTIFICATION, payload);
+    }
   });
   io.once("close", unsubscribeNotifications);
   console.info("[websocket] Serveur Socket.IO initialisé.");
@@ -322,6 +329,8 @@ export function attachGameGateway(httpServer: HttpServer) {
         if (userSocket.connected) userSocket.disconnect(true);
       });
       userSocket.join(`user:${userSocket.data.userId}`);
+    } else if (userSocket.data.guestParticipantId !== null) {
+      userSocket.join(`guest:${userSocket.data.guestParticipantId}`);
     }
 
     const sessionCheck = setInterval(() => {
