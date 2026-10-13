@@ -5,6 +5,7 @@ import {
   createRoundRobinPairings,
   createSwissPairings,
   getPairKey,
+  sortSwissStandings,
   type PairingPlayer,
 } from "./tournamentPairing";
 
@@ -78,5 +79,59 @@ describe("tournament pairing algorithms", () => {
     for (const pairing of plan.pairings) {
       expect(previousOpponents.has(getPairKey(pairing.white.id, pairing.black.id))).toBe(false);
     }
+  });
+
+  it("breaks Swiss ties by score, Buchholz and median Buchholz", () => {
+    const standings = [
+      {
+        participantId: 1,
+        score: 2,
+        wins: 2,
+        seed: 1,
+        joinedAt: new Date(2026, 0, 1),
+        opponents: new Set([2, 3]),
+      },
+      {
+        participantId: 2,
+        score: 2,
+        wins: 2,
+        seed: 2,
+        joinedAt: new Date(2026, 0, 2),
+        opponents: new Set([1, 4]),
+      },
+      {
+        participantId: 3,
+        score: 2,
+        wins: 1,
+        seed: 3,
+        joinedAt: new Date(2026, 0, 3),
+        opponents: new Set([1, 5]),
+      },
+      {
+        participantId: 4,
+        score: 1.5,
+        wins: 1,
+        seed: 4,
+        joinedAt: new Date(2026, 0, 4),
+        opponents: new Set([2, 5]),
+      },
+      {
+        participantId: 5,
+        score: 1.5,
+        wins: 1,
+        seed: 5,
+        joinedAt: new Date(2026, 0, 5),
+        opponents: new Set([3, 4]),
+      },
+    ] as const;
+
+    const ranked = sortSwissStandings(standings.map((standing) => ({
+      ...standing,
+      score: standing.score,
+    })));
+
+    expect(ranked.map((standing) => standing.participantId)).toEqual([1, 2, 3, 4, 5]);
+    expect(ranked[0].score).toBe(2);
+    expect(ranked[0].wins).toBe(2);
   });
 });

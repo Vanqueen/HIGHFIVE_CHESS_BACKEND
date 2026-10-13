@@ -184,11 +184,33 @@ export class MoveService {
 
       const pastMoves = await findMovesByGameId(gameId);
       const ply = pastMoves.length + 1;
+
+      const historyChess = new Chess(STANDARD_START_FEN);
+      for (const pastMove of pastMoves) {
+        const move = historyChess.move({
+          from: pastMove.from,
+          to: pastMove.to,
+          ...(pastMove.promotion ? { promotion: promotionSymbols[pastMove.promotion as Promotion] } : {}),
+        });
+        if (!move) {
+          throw new HttpError("L'historique de la partie est incohérent pour la détection de répétition.", 500, false);
+        }
+      }
+      const currentHistoryMove = historyChess.move({
+        from: input.from,
+        to: input.to,
+        ...(input.promotion ? { promotion: promotionSymbols[input.promotion] } : {}),
+      });
+      if (!currentHistoryMove) {
+        throw new HttpError("Le coup joué est incohérent avec l'historique de la partie.", 500, false);
+      }
+
       let status: "IN_PROGRESS" | "FINISHED" = "IN_PROGRESS";
       let result: "WHITE_WIN" | "BLACK_WIN" | "DRAW" | null = null;
       let terminationReason:
         | "CHECKMATE"
         | "STALEMATE"
+        | "THREEFOLD_REPETITION"
         | "FIFTY_MOVE_RULE"
         | "INSUFFICIENT_MATERIAL"
         | null = null;
@@ -201,6 +223,10 @@ export class MoveService {
         status = "FINISHED";
         result = "DRAW";
         terminationReason = "STALEMATE";
+      } else if (historyChess.isThreefoldRepetition()) {
+        status = "FINISHED";
+        result = "DRAW";
+        terminationReason = "THREEFOLD_REPETITION";
       } else if (chess.isInsufficientMaterial()) {
         status = "FINISHED";
         result = "DRAW";

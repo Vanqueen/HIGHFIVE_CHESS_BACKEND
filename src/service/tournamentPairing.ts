@@ -145,6 +145,50 @@ export function createSwissPairings(
   };
 }
 
+export interface SwissStandingLike {
+  participantId: number;
+  score: number;
+  wins: number;
+  seed: number | null;
+  joinedAt: Date;
+  opponents: Set<number>;
+}
+
+export function sortSwissStandings<T extends SwissStandingLike>(standings: T[]) {
+  const scoreByParticipantId = new Map<number, number>(
+    standings.map((standing) => [standing.participantId, standing.score]),
+  );
+
+  const ranking = standings.map((standing) => {
+    const opponentScores = [...standing.opponents]
+      .map((participantId) => scoreByParticipantId.get(participantId) ?? 0)
+      .sort((left, right) => left - right);
+    const medianBuchholz = opponentScores.length === 0
+      ? 0
+      : opponentScores.length % 2 === 0
+        ? (opponentScores[opponentScores.length / 2 - 1] + opponentScores[opponentScores.length / 2]) / 2
+        : opponentScores[Math.floor(opponentScores.length / 2)];
+
+    return {
+      standing,
+      buchholz: opponentScores.reduce((sum, score) => sum + score, 0),
+      medianBuchholz,
+    };
+  });
+
+  return ranking
+    .sort((left, right) =>
+      right.standing.score - left.standing.score ||
+      right.buchholz - left.buchholz ||
+      right.medianBuchholz - left.medianBuchholz ||
+      right.standing.wins - left.standing.wins ||
+      (left.standing.seed ?? Number.MAX_SAFE_INTEGER) - (right.standing.seed ?? Number.MAX_SAFE_INTEGER) ||
+      left.standing.joinedAt.getTime() - right.standing.joinedAt.getTime() ||
+      left.standing.participantId - right.standing.participantId,
+    )
+    .map(({ standing }) => standing);
+}
+
 export function getPairKey(firstId: number, secondId: number) {
   return pairKey(firstId, secondId);
 }

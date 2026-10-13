@@ -1,7 +1,11 @@
 import { db } from "../prisma/db.ts";
+import { finalizeGameFinishedEffects, publishGameFinishedNotifications } from "../service/gameFinishedEffects";
+import type { NotificationBroadcast } from "../events/notification.broadcast";
+import { Temporal } from "temporal-polyfill";
+import { hasAffectedRows } from "./affected-rows";
 
 export async function startGameClock(gameId: number) {
-  const now = new Date();
+  const now = Temporal.Now.instant();
   return db.orm.public.Game
     .where({
       id: gameId,
@@ -19,7 +23,7 @@ export async function startGameClock(gameId: number) {
 }
 
 export async function setDrawOffer(gameId: number, participantId: number) {
-  const now = new Date();
+  const now = Temporal.Now.instant();
   return db.orm.public.Game
     .where({ id: gameId, status: "IN_PROGRESS", drawOfferParticipantId: null })
     .update({ drawOfferParticipantId: participantId, lastActivityAt: now });
@@ -32,31 +36,67 @@ export async function resolveDrawOffer(
   whiteTimeRemainingMs: bigint,
   blackTimeRemainingMs: bigint,
 ) {
-  const now = new Date();
-  return db.orm.public.Game
-    .where({
-      id: gameId,
-      status: "IN_PROGRESS",
-      drawOfferParticipantId: offeringParticipantId,
-    })
-    .update(accept
-      ? {
-          status: "FINISHED",
-          result: "DRAW",
-          terminationReason: "AGREEMENT",
-          endedAt: now,
-          activeColor: null,
-          clockStartedAt: null,
-          whiteTimeRemainingMs,
-          blackTimeRemainingMs,
-          drawOfferParticipantId: null,
-          pendingUndoParticipantId: null,
-          lastActivityAt: now,
-        }
-      : {
-          drawOfferParticipantId: null,
-          lastActivityAt: now,
-        });
+  const now = Temporal.Now.instant();
+  const notifications: NotificationBroadcast[] = [];
+  const updatedGame = await db.transaction(async (tx) => {
+    const locked = await tx.orm.public.Game.where({ id: gameId })
+      .update({ lastActivityAt: now });
+    if (!hasAffectedRows(locked)) return null;
+    const currentGame = await tx.orm.public.Game.where({ id: gameId }).first();
+    if (
+      !currentGame ||
+      currentGame.status !== "IN_PROGRESS" ||
+      currentGame.drawOfferParticipantId !== offeringParticipantId
+    ) {
+      return null;
+    }
+
+    const updatedGame = await tx.orm.public.Game
+      .where({
+        id: gameId,
+        status: "IN_PROGRESS",
+        drawOfferParticipantId: offeringParticipantId,
+      })
+      .update(accept
+        ? {
+            status: "FINISHED",
+            result: "DRAW",
+            terminationReason: "AGREEMENT",
+            endedAt: now,
+            activeColor: null,
+            clockStartedAt: null,
+            whiteTimeRemainingMs,
+            blackTimeRemainingMs,
+            drawOfferParticipantId: null,
+            pendingUndoParticipantId: null,
+            lastActivityAt: now,
+          }
+        : {
+            drawOfferParticipantId: null,
+            lastActivityAt: now,
+          });
+    if (!hasAffectedRows(updatedGame)) return null;
+    if (!accept) return updatedGame;
+
+    const finalizedGame = await tx.orm.public.Game.where({ id: gameId }).first();
+    if (
+      finalizedGame &&
+      (finalizedGame.status === "FINISHED" || finalizedGame.status === "CANCELLED")
+    ) {
+      notifications.push(...await finalizeGameFinishedEffects(tx, {
+        id: finalizedGame.id,
+        type: finalizedGame.type,
+        status: finalizedGame.status,
+        isRated: finalizedGame.isRated,
+        ratingCategory: finalizedGame.ratingCategory,
+        result: finalizedGame.result,
+        tournamentRoundId: finalizedGame.tournamentRoundId,
+      }, await tx.orm.public.GameParticipant.where({ gameId }).all()));
+    }
+    return updatedGame;
+  });
+  publishGameFinishedNotifications(notifications);
+  return updatedGame;
 }
 
 export async function finishGame(
@@ -65,34 +105,64 @@ export async function finishGame(
     result: "WHITE_WIN" | "BLACK_WIN" | "DRAW";
     terminationReason: "RESIGNATION" | "TIMEOUT";
     activeColor?: "WHITE" | "BLACK" | null;
-    clockStartedAt?: Date | null;
+    clockStartedAt?: ReturnType<typeof Temporal.Now.instant> | null;
     whiteTimeRemainingMs?: bigint;
     blackTimeRemainingMs?: bigint;
   },
 ) {
-  const now = new Date();
-  return db.orm.public.Game
-    .where({ id: gameId, status: "IN_PROGRESS" })
-    .update({
-      status: "FINISHED",
-      ...updates,
-      endedAt: now,
-      activeColor: null,
-      clockStartedAt: null,
-      drawOfferParticipantId: null,
-      pendingUndoParticipantId: null,
-      lastActivityAt: now,
-    });
+  const now = Temporal.Now.instant();
+  const notifications: NotificationBroadcast[] = [];
+  const updatedGame = await db.transaction(async (tx) => {
+    const locked = await tx.orm.public.Game.where({ id: gameId })
+      .update({ lastActivityAt: now });
+    if (!hasAffectedRows(locked)) return null;
+    const currentGame = await tx.orm.public.Game.where({ id: gameId }).first();
+    if (!currentGame || currentGame.status !== "IN_PROGRESS") return null;
+
+    const updatedGame = await tx.orm.public.Game
+      .where({ id: gameId, status: "IN_PROGRESS" })
+      .update({
+        status: "FINISHED",
+        ...updates,
+        endedAt: now,
+        activeColor: null,
+        clockStartedAt: null,
+        drawOfferParticipantId: null,
+        pendingUndoParticipantId: null,
+        lastActivityAt: now,
+      });
+    if (!hasAffectedRows(updatedGame)) return null;
+
+    const finalizedGame = await tx.orm.public.Game.where({ id: gameId }).first();
+    if (
+      finalizedGame &&
+      (finalizedGame.status === "FINISHED" || finalizedGame.status === "CANCELLED")
+    ) {
+      notifications.push(...await finalizeGameFinishedEffects(tx, {
+        id: finalizedGame.id,
+        type: finalizedGame.type,
+        status: finalizedGame.status,
+        isRated: finalizedGame.isRated,
+        ratingCategory: finalizedGame.ratingCategory,
+        result: finalizedGame.result,
+        tournamentRoundId: finalizedGame.tournamentRoundId,
+      }, await tx.orm.public.GameParticipant.where({ gameId }).all()));
+    }
+    return updatedGame;
+  });
+  publishGameFinishedNotifications(notifications);
+  return updatedGame;
 }
 
 export async function claimGameNoShow(
   gameId: number,
   participantId: number,
   outcome: "DRAW" | "CANCEL" | "WIN",
-  expectedStartedAt: Date,
+  expectedStartedAt: ReturnType<typeof Temporal.Now.instant>,
 ) {
-  return db.transaction(async (tx) => {
-    const now = new Date();
+  const notifications: NotificationBroadcast[] = [];
+  const finalGame = await db.transaction(async (tx) => {
+    const now = Temporal.Now.instant();
     const game = await tx.orm.public.Game
       .where({
         id: gameId,
@@ -101,7 +171,7 @@ export async function claimGameNoShow(
         startedAt: expectedStartedAt,
       })
       .first();
-    if (!game || now.getTime() - game.startedAt!.getTime() < 60_000) return null;
+    if (!game || now.epochMilliseconds - game.startedAt!.epochMilliseconds < 60_000) return null;
 
     const claimant = await tx.orm.public.GameParticipant
       .where({ id: participantId, gameId, color: "BLACK" })
@@ -124,12 +194,23 @@ export async function claimGameNoShow(
         startedAt: expectedStartedAt,
       })
       .update({ lastActivityAt: now });
-    if (!locked) return null;
+    if (!hasAffectedRows(locked)) return null;
+
+    const currentGame = await tx.orm.public.Game.where({ id: gameId }).first();
+    if (
+      !currentGame ||
+      currentGame.status !== "IN_PROGRESS" ||
+      currentGame.activeColor !== "WHITE" ||
+      currentGame.currentFen !== game.currentFen ||
+      currentGame.startedAt?.epochMilliseconds !== expectedStartedAt.epochMilliseconds
+    ) {
+      return null;
+    }
 
     const moves = await tx.orm.public.Move.where({ gameId }).all();
     if (moves.length > 0) return null;
 
-    return tx.orm.public.Game
+    const finalGame = await tx.orm.public.Game
       .where({
         id: gameId,
         status: "IN_PROGRESS",
@@ -160,7 +241,29 @@ export async function claimGameNoShow(
             pendingUndoParticipantId: null,
             lastActivityAt: now,
           });
+
+    if (!hasAffectedRows(finalGame)) return null;
+    if (outcome === "CANCEL") return finalGame;
+
+    const finalizedGame = await tx.orm.public.Game.where({ id: gameId }).first();
+    if (
+      finalizedGame &&
+      (finalizedGame.status === "FINISHED" || finalizedGame.status === "CANCELLED")
+    ) {
+      notifications.push(...await finalizeGameFinishedEffects(tx, {
+        id: finalizedGame.id,
+        type: finalizedGame.type,
+        status: finalizedGame.status,
+        isRated: finalizedGame.isRated,
+        ratingCategory: finalizedGame.ratingCategory,
+        result: finalizedGame.result,
+        tournamentRoundId: finalizedGame.tournamentRoundId,
+      }, await tx.orm.public.GameParticipant.where({ gameId }).all()));
+    }
+    return finalGame;
   });
+  publishGameFinishedNotifications(notifications);
+  return finalGame;
 }
 
 export async function finishGameOnTimeout(
@@ -170,27 +273,63 @@ export async function finishGameOnTimeout(
   whiteTimeRemainingMs: bigint,
   blackTimeRemainingMs: bigint,
 ) {
-  const now = new Date();
-  return db.orm.public.Game
-    .where({
-      id: gameId,
-      status: "IN_PROGRESS",
-      currentFen: expectedFen,
-      activeColor,
-    })
-    .update({
-      status: "FINISHED",
-      result: activeColor === "WHITE" ? "BLACK_WIN" : "WHITE_WIN",
-      terminationReason: "TIMEOUT",
-      whiteTimeRemainingMs,
-      blackTimeRemainingMs,
-      endedAt: now,
-      activeColor: null,
-      clockStartedAt: null,
-      drawOfferParticipantId: null,
-      pendingUndoParticipantId: null,
-      lastActivityAt: now,
-    });
+  const now = Temporal.Now.instant();
+  const notifications: NotificationBroadcast[] = [];
+  const updatedGame = await db.transaction(async (tx) => {
+    const locked = await tx.orm.public.Game.where({ id: gameId })
+      .update({ lastActivityAt: now });
+    if (!hasAffectedRows(locked)) return null;
+    const currentGame = await tx.orm.public.Game.where({ id: gameId }).first();
+    if (
+      !currentGame ||
+      currentGame.status !== "IN_PROGRESS" ||
+      currentGame.currentFen !== expectedFen ||
+      currentGame.activeColor !== activeColor
+    ) {
+      return null;
+    }
+
+    const updatedGame = await tx.orm.public.Game
+      .where({
+        id: gameId,
+        status: "IN_PROGRESS",
+        currentFen: expectedFen,
+        activeColor,
+      })
+      .update({
+        status: "FINISHED",
+        result: activeColor === "WHITE" ? "BLACK_WIN" : "WHITE_WIN",
+        terminationReason: "TIMEOUT",
+        whiteTimeRemainingMs,
+        blackTimeRemainingMs,
+        endedAt: now,
+        activeColor: null,
+        clockStartedAt: null,
+        drawOfferParticipantId: null,
+        pendingUndoParticipantId: null,
+        lastActivityAt: now,
+      });
+    if (!hasAffectedRows(updatedGame)) return null;
+
+    const finalizedGame = await tx.orm.public.Game.where({ id: gameId }).first();
+    if (
+      finalizedGame &&
+      (finalizedGame.status === "FINISHED" || finalizedGame.status === "CANCELLED")
+    ) {
+      notifications.push(...await finalizeGameFinishedEffects(tx, {
+        id: finalizedGame.id,
+        type: finalizedGame.type,
+        status: finalizedGame.status,
+        isRated: finalizedGame.isRated,
+        ratingCategory: finalizedGame.ratingCategory,
+        result: finalizedGame.result,
+        tournamentRoundId: finalizedGame.tournamentRoundId,
+      }, await tx.orm.public.GameParticipant.where({ gameId }).all()));
+    }
+    return updatedGame;
+  });
+  publishGameFinishedNotifications(notifications);
+  return updatedGame;
 }
 
 export async function createUndoRequest(
@@ -206,7 +345,7 @@ export async function createUndoRequest(
       currentFen: expectedFen,
       pendingUndoParticipantId: null,
     })
-    .update({ pendingUndoParticipantId: participantId, lastActivityAt: new Date() });
+    .update({ pendingUndoParticipantId: participantId, lastActivityAt: Temporal.Now.instant() });
 }
 
 export async function clearUndoRequest(
@@ -222,7 +361,7 @@ export async function clearUndoRequest(
       currentFen: expectedFen,
       pendingUndoParticipantId: participantId,
     })
-    .update({ pendingUndoParticipantId: null, lastActivityAt: new Date() });
+    .update({ pendingUndoParticipantId: null, lastActivityAt: Temporal.Now.instant() });
 }
 
 export async function acceptUndoRequest(
@@ -243,7 +382,7 @@ export async function acceptUndoRequest(
     const latestMove = recentMoves[0];
     if (!latestMove) return null;
 
-    const now = new Date();
+    const now = Temporal.Now.instant();
     const updatedGame = await tx.orm.public.Game
       .where({
         id: gameId,

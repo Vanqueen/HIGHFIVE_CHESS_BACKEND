@@ -31,6 +31,7 @@ import {
   createRoundRobinPairings,
   createSwissPairings,
   getPairKey,
+  sortSwissStandings,
   type PairingPlayer,
 } from "./tournamentPairing";
 
@@ -190,12 +191,7 @@ async function readStandings(tournamentId: number) {
     }
   }
 
-  return standings.sort((left, right) =>
-    right.score - left.score ||
-    right.wins - left.wins ||
-    (left.seed ?? Number.MAX_SAFE_INTEGER) - (right.seed ?? Number.MAX_SAFE_INTEGER) ||
-    left.joinedAt.getTime() - right.joinedAt.getTime()
-  );
+  return sortSwissStandings(standings);
 }
 
 function getPairingPlayers(standings: Standing[]): PairingPlayer[] {

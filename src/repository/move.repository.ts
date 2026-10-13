@@ -1,4 +1,10 @@
 import { db } from "../prisma/db.ts";
+import type { NotificationBroadcast } from "../events/notification.broadcast";
+import {
+  finalizeGameFinishedEffects,
+  publishGameFinishedNotifications,
+} from "../service/gameFinishedEffects";
+import { hasAffectedRows } from "./affected-rows";
 
 export type CreateMoveData = Parameters<typeof db.orm.public.Move.create>[0];
 type UpdateMoveData = Parameters<ReturnType<typeof db.orm.public.Move.where>["update"]>[0];
@@ -44,7 +50,8 @@ export async function appendMove(
   move: CreateMoveData,
   gameUpdates: Parameters<ReturnType<typeof db.orm.public.Game.where>["update"]>[0],
 ) {
-  return db.transaction(async (tx) => {
+  const notifications: NotificationBroadcast[] = [];
+  const result = await db.transaction(async (tx) => {
     const updatedGame = await tx.orm.public.Game
       .where({
         id: gameId,
@@ -54,13 +61,31 @@ export async function appendMove(
         pendingUndoParticipantId: null,
       })
       .update(gameUpdates);
-    if (!updatedGame) {
+    if (!hasAffectedRows(updatedGame)) {
       throw new MoveRepositoryConflict();
     }
 
     const createdMove = await tx.orm.public.Move.create(move);
+
+    if (updatedGame?.status === "FINISHED") {
+      const finalizedGame = await tx.orm.public.Game.where({ id: gameId }).first();
+      if (finalizedGame && finalizedGame.status === "FINISHED") {
+        notifications.push(...await finalizeGameFinishedEffects(tx, {
+          id: finalizedGame.id,
+          type: finalizedGame.type,
+          status: finalizedGame.status,
+          isRated: finalizedGame.isRated,
+          ratingCategory: finalizedGame.ratingCategory,
+          result: finalizedGame.result,
+          tournamentRoundId: finalizedGame.tournamentRoundId,
+        }, await tx.orm.public.GameParticipant.where({ gameId }).all()));
+      }
+    }
+
     return { game: updatedGame, move: createdMove };
   });
+  publishGameFinishedNotifications(notifications);
+  return result;
 }
 
 export async function updateMove(id: number, updates: UpdateMoveData) {

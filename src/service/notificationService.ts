@@ -1,12 +1,40 @@
 import { publishNotification } from "../events/notification.broadcast";
+import type { NotificationBroadcast } from "../events/notification.broadcast";
+import { db } from "../prisma/db.ts";
 import { createNotification, findNotificationsForUser } from "../repository/notification.repository";
+
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 type NotificationType =
   | "CHALLENGE_RECEIVED"
   | "CHALLENGE_ACCEPTED"
+  | "GAME_STARTED"
+  | "GAME_FINISHED"
+  | "GAME_YOUR_TURN"
   | "SYSTEM";
 
 export class NotificationService {
+  static createInTransaction(
+    tx: Transaction,
+    userId: number,
+    type: NotificationType,
+    title: string,
+    content: string,
+    data: Record<string, number | string>,
+  ) {
+    return tx.orm.public.Notification.create({
+      userId,
+      type,
+      title,
+      content,
+      data,
+    });
+  }
+
+  static publish(notification: NotificationBroadcast) {
+    publishNotification(notification);
+  }
+
   static async create(
     userId: number,
     type: NotificationType,
@@ -21,7 +49,7 @@ export class NotificationService {
       content,
       data,
     });
-    publishNotification(notification);
+    this.publish(notification);
     return notification;
   }
 

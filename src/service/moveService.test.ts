@@ -1,3 +1,4 @@
+import { Chess } from "chess.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -91,6 +92,63 @@ describe("MoveService.playMove", () => {
       terminationReason: null,
     });
     expect(updates.startedAt).toBeInstanceOf(Date);
+  });
+
+  it("finishes a game on threefold repetition after replaying the move history", async () => {
+    const sequence = ["Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1"];
+    const history = new Chess();
+    const priorMoves: Array<{ from: string; to: string; promotion: null; san: string; fenAfter: string }> = [];
+    for (const san of sequence) {
+      const move = history.move(san);
+      if (!move) throw new Error(`Illegal move during repetition test: ${san}`);
+      priorMoves.push({
+        from: move.from,
+        to: move.to,
+        promotion: null,
+        san: move.san,
+        fenAfter: history.fen(),
+      });
+    }
+
+    const finalMove = history.moves({ verbose: true }).find(
+      (move: { from: string; to: string; san: string }) => move.from === "f6" && move.to === "g8",
+    );
+    if (!finalMove) throw new Error("Expected a legal final move to complete the repetition pattern.");
+
+    const repetitionBoard = new Chess();
+    for (const san of [...sequence, finalMove.san]) {
+      const move = repetitionBoard.move(san);
+      if (!move) throw new Error(`Illegal move during repetition verification: ${san}`);
+    }
+    expect(repetitionBoard.isThreefoldRepetition()).toBe(true);
+
+    mocks.findGame.mockResolvedValue({
+      id: 41,
+      currentFen: history.fen(),
+      status: "IN_PROGRESS",
+      activeColor: "BLACK",
+      pendingUndoParticipantId: null,
+      initialTimeSeconds: 0,
+      incrementSeconds: 0,
+      whiteTimeRemainingMs: 0n,
+      blackTimeRemainingMs: 0n,
+      clockStartedAt: new Date(),
+    });
+    mocks.findGameParticipantsByGameId.mockResolvedValue([
+      { id: 1, gameId: 41, userId: 7, color: "BLACK", participantType: "USER" },
+      { id: 2, gameId: 41, userId: null, color: "WHITE", participantType: "AI" },
+    ]);
+    mocks.findMovesByGameId.mockResolvedValue(priorMoves);
+
+    await MoveService.playMove(41, 7, { from: finalMove.from, to: finalMove.to });
+
+    expect(mocks.appendMove).toHaveBeenCalledOnce();
+    const [, , , , , updates] = mocks.appendMove.mock.calls[0];
+    expect(updates).toMatchObject({
+      status: "FINISHED",
+      result: "DRAW",
+      terminationReason: "THREEFOLD_REPETITION",
+    });
   });
 
   it("rejects illegal moves without persisting them", async () => {

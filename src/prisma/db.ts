@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../config/environment.ts";
 import postgres from "@prisma/orm-postgres/runtime";
 
 import "temporal-polyfill/global";
