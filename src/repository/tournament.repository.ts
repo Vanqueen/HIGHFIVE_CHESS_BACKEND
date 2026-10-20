@@ -1,10 +1,19 @@
 import { db } from "../prisma/db.ts";
 import { calculateTournamentRatingChanges } from "../service/tournamentRating";
 import { Temporal } from "temporal-polyfill";
+import { toTemporal } from "../utils/temporalDate.ts";
 
 const STANDARD_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 type CreateTournamentData = Parameters<typeof db.orm.public.Tournament.create>[0];
+type CreateTournamentInput = Omit<
+  CreateTournamentData,
+  "registrationStartsAt" | "registrationEndsAt" | "startsAt"
+> & {
+  registrationStartsAt: Date;
+  registrationEndsAt: Date;
+  startsAt: Date;
+};
 type CreateTournamentParticipantData =
   Parameters<typeof db.orm.public.TournamentParticipant.create>[0];
 
@@ -53,8 +62,13 @@ export async function findTournaments(limit = 100) {
     .all();
 }
 
-export async function createTournament(data: CreateTournamentData) {
-  return db.orm.public.Tournament.create(data);
+export async function createTournament(data: CreateTournamentInput) {
+  return db.orm.public.Tournament.create({
+    ...data,
+    registrationStartsAt: toTemporal(data.registrationStartsAt),
+    registrationEndsAt: toTemporal(data.registrationEndsAt),
+    startsAt: toTemporal(data.startsAt),
+  });
 }
 
 export async function findTournamentParticipants(tournamentId: number) {
@@ -126,6 +140,19 @@ export async function registerTournamentUser(
         .first();
       if (!invitationLink || (invitationLink.expiresAt && invitationLink.expiresAt <= now)) {
         return { kind: "invalid-link" as const };
+      }
+      const [organizerBlockedUser, userBlockedOrganizer] = await Promise.all([
+        tx.orm.public.BlockedUser.where({
+          blockerId: invitationLink.creatorId,
+          blockedUserId: userId,
+        }).first(),
+        tx.orm.public.BlockedUser.where({
+          blockerId: userId,
+          blockedUserId: invitationLink.creatorId,
+        }).first(),
+      ]);
+      if (organizerBlockedUser || userBlockedOrganizer) {
+        return { kind: "blocked" as const };
       }
       if (
         invitationLink.maxUses !== null &&
@@ -252,7 +279,7 @@ export async function createTournamentInvitationLink(data: {
     challengeId: null,
     maxUses: data.maxUses,
     currentUses: 0,
-    expiresAt: data.expiresAt,
+    expiresAt: data.expiresAt === null ? null : toTemporal(data.expiresAt),
     status: "ACTIVE",
   });
 }

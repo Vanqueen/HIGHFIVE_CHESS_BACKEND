@@ -1,4 +1,5 @@
 import { db } from "../prisma/db.ts";
+import { toTemporal } from "../utils/temporalDate.ts";
 
 // ─── Read ────────────────────────────────────────────────────────────────────
 
@@ -12,6 +13,16 @@ export async function findUserByEmail(email: string) {
 
 export async function findUserByUsername(username: string) {
   return db.orm.public.User.where({ username }).first();
+}
+
+export async function searchActiveUsers(username: string, limit = 10) {
+  return db.orm.public.User
+    .select("id", "username", "avatarUrl")
+    .where({ accountStatus: "ACTIVE", deletedAt: null })
+    .where((user) => user.username.ilike(`%${username}%`))
+    .orderBy((user) => user.username.asc())
+    .limit(limit)
+    .all();
 }
 
 export async function findUsers(limit = 10) {
@@ -50,7 +61,6 @@ export async function createUser(
     role,
     accountStatus,
     avatarUrl: avatarUrl ?? null,
-    createdAt: new Date(),
   });
 }
 
@@ -104,7 +114,7 @@ export async function savePendingEmailChange(
   return db.orm.public.User.where({ id }).update({
     pendingEmail: email,
     emailChangeCodeHash: codeHash,
-    emailChangeExpiresAt: expiresAt,
+    emailChangeExpiresAt: toTemporal(expiresAt),
   });
 }
 
@@ -121,7 +131,7 @@ export async function completePendingEmailChange(
         deletedAt: null,
         pendingEmail: email,
         emailChangeCodeHash: codeHash,
-        emailChangeExpiresAt: expiresAt,
+        emailChangeExpiresAt: toTemporal(expiresAt),
       })
       .update({
         email,
@@ -135,9 +145,9 @@ export async function completePendingEmailChange(
 
     const now = new Date();
     await tx.orm.public.Session.where({ userId: id, revokedAt: null })
-      .update({ revokedAt: now });
+      .update({ revokedAt: toTemporal(now) });
     await tx.orm.public.RefreshToken.where({ userId: id, revokedAt: null })
-      .update({ revokedAt: now });
+      .update({ revokedAt: toTemporal(now) });
     return true;
   });
 }
@@ -166,7 +176,7 @@ export async function updateAvatar(
 
 export async function recordLogin(id: number) {
   return db.orm.public.User.where({ id }).update({
-    lastLoginAt: new Date(),
+    lastLoginAt: toTemporal(new Date()),
     failedLoginAttempts: 0,
   });
 }
@@ -198,7 +208,7 @@ export async function resetLoginAttempts(id: number) {
 }
 
 export async function lockUser(id: number, lockedUntil: Date) {
-  return db.orm.public.User.where({ id }).update({ lockedUntil });
+  return db.orm.public.User.where({ id }).update({ lockedUntil: toTemporal(lockedUntil) });
 }
 
 export async function unlockUser(id: number) {
@@ -222,7 +232,7 @@ export async function setConnectionStatus(id: number, connectionStatus: "ONLINE"
 // ─── Soft delete ─────────────────────────────────────────────────────────────
 
 export async function markUserForDeletion(id: number) {
-  return db.orm.public.User.where({ id }).update({ deletedAt: new Date() });
+  return db.orm.public.User.where({ id }).update({ deletedAt: toTemporal(new Date()) });
 }
 
 export async function restoreDeletedUser(id: number) {

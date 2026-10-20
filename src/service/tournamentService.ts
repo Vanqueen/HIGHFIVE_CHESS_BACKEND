@@ -108,6 +108,8 @@ function mapRegistrationResult(result: Awaited<ReturnType<typeof registerTournam
       throw new HttpError("Ce lien d'invitation a atteint sa limite d'utilisations.", 410, false);
     case "invalid-link":
       throw new HttpError("Lien d'invitation de tournoi invalide ou expiré.", 410, false);
+    case "blocked":
+      throw new HttpError("Cette interaction n’est pas autorisée.", 403, false);
   }
 }
 

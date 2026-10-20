@@ -8,7 +8,7 @@ export interface NotificationBroadcast {
   title: string;
   content: string;
   data: unknown;
-  createdAt: Date;
+  createdAt: Date | string | { epochMilliseconds: number };
 }
 
 const notifications = new EventEmitter();

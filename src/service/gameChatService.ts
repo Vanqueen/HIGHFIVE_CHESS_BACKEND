@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createGameMessage, findGameMessages } from "../repository/game-chat.repository";
+import { epochMilliseconds } from "../utils/temporalDate.ts";
 import { GameService } from "./gameService";
 import HttpError, { rethrowServiceError } from "./errorService";
 
@@ -24,7 +25,7 @@ const guestMessagesByGame = new Map<number, GuestGameMessage[]>();
 function pruneGuestMessages(now = Date.now()) {
   for (const [gameId, messages] of guestMessagesByGame) {
     const retained = messages.filter(
-      (message) => now - message.createdAt.getTime() < GUEST_MESSAGE_RETENTION_MS,
+      (message) => now - epochMilliseconds(message.createdAt) < GUEST_MESSAGE_RETENTION_MS,
     );
     if (retained.length) guestMessagesByGame.set(gameId, retained);
     else guestMessagesByGame.delete(gameId);
@@ -36,7 +37,9 @@ function combineMessages(
   guestMessages: GuestGameMessage[],
 ) {
   return [...persistedMessages, ...guestMessages]
-    .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+    .sort((left, right) =>
+      epochMilliseconds(left.createdAt) - epochMilliseconds(right.createdAt)
+    )
     .slice(-MAX_VISIBLE_MESSAGES);
 }
 

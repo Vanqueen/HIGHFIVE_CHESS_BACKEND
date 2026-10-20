@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Temporal } from "temporal-polyfill";
 
 const mocks = vi.hoisted(() => ({
   acceptUndoRequest: vi.fn(),
@@ -130,6 +131,28 @@ describe("GameService game actions", () => {
     expect(mocks.startGameClock).toHaveBeenCalledOnce();
   });
 
+  it("calculates a clock from a Temporal.Instant timestamp", async () => {
+    const startedAt = Temporal.Instant.fromEpochMilliseconds(Date.now() - 250);
+    mocks.findGame.mockResolvedValue({
+      ...game,
+      status: "IN_PROGRESS",
+      initialTimeSeconds: 60,
+      activeColor: "BLACK",
+      clockStartedAt: startedAt,
+      whiteTimeRemainingMs: 60_000n,
+      blackTimeRemainingMs: 60_000n,
+    });
+
+    await expect(GameService.getClock(41)).resolves.toMatchObject({
+      whiteTimeRemainingMs: "60000",
+      expired: false,
+    });
+    const result = await GameService.getClock(41);
+    expect(Number(result.blackTimeRemainingMs)).toBeLessThanOrEqual(59_800);
+    expect(Number(result.blackTimeRemainingMs)).toBeGreaterThan(59_000);
+    expect(mocks.finishGameOnTimeout).not.toHaveBeenCalled();
+  });
+
   it("allows a guest participant to offer a draw using their participant id", async () => {
     mocks.findGameParticipantsByGameId.mockResolvedValue([
       participants[0],
@@ -165,6 +188,22 @@ describe("GameService game actions", () => {
       "WIN",
       expect.any(Date),
     );
+  });
+
+  it("checks the no-show deadline when startedAt is a Temporal.Instant", async () => {
+    const startedAt = Temporal.Instant.fromEpochMilliseconds(Date.now() - 61_000);
+    mocks.findGame.mockResolvedValue({
+      ...game,
+      type: "TOURNAMENT",
+      activeColor: "WHITE",
+      currentFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      startedAt,
+    });
+    mocks.claimGameNoShow.mockResolvedValue({ status: "FINISHED", result: "BLACK_WIN" });
+
+    await GameService.claimNoShow(41, 8, "WIN");
+
+    expect(mocks.claimGameNoShow).toHaveBeenCalledWith(41, 2, "WIN", startedAt);
   });
 
   it("allows a guest to claim a draw after the first-move no-show delay", async () => {

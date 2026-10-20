@@ -5,7 +5,11 @@ import { authenticateOptional } from "../middlewares/auth.middleware";
 const invitationLinksRouter = Router();
 
 invitationLinksRouter.post("/anonymous", InvitationLinkController.createAnonymousGame);
-invitationLinksRouter.post("/anonymous/redeem", InvitationLinkController.joinAnonymousGame);
+invitationLinksRouter.post(
+  "/anonymous/redeem",
+  authenticateOptional,
+  InvitationLinkController.joinAnonymousGame,
+);
 invitationLinksRouter.post("/redeem", authenticateOptional, InvitationLinkController.redeem);
 
 export default invitationLinksRouter;

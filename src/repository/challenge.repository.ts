@@ -2,8 +2,11 @@ import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.ts";
 import type { NotificationBroadcast } from "../events/notification.broadcast";
 import { createNotificationInTransaction } from "./notification.repository";
+import { toTemporal } from "../utils/temporalDate.ts";
+import { oppositeChessColor, type ChessColor } from "../utils/chessColor.ts";
 
 type CreateChallengeData = Parameters<typeof db.orm.public.Challenge.create>[0];
+type CreateChallengeWithGameData = Omit<CreateChallengeData, "expiresAt"> & { expiresAt: Date };
 type UpdateChallengeData = Parameters<
   ReturnType<typeof db.orm.public.Challenge.where>["update"]
 >[0];
@@ -42,14 +45,35 @@ export async function createChallenge(data: CreateChallengeData) {
 }
 
 export async function createChallengeWithGame(
-  challengeData: CreateChallengeData,
+  challengeData: CreateChallengeWithGameData,
   initialTimeSeconds: number,
   incrementSeconds: number,
   creatorUsername: string,
+  creatorColor: ChessColor,
 ) {
   // Keep the challenge, its waiting game and the creator's seat consistent on failure.
   return db.transaction(async (tx) => {
-    const challenge = await tx.orm.public.Challenge.create(challengeData);
+    if (challengeData.invitedUserId !== null) {
+      const [creatorBlockedInvitee, inviteeBlockedCreator] = await Promise.all([
+        tx.orm.public.BlockedUser.where({
+          blockerId: challengeData.creatorId,
+          blockedUserId: challengeData.invitedUserId,
+        }).first(),
+        tx.orm.public.BlockedUser.where({
+          blockerId: challengeData.invitedUserId,
+          blockedUserId: challengeData.creatorId,
+        }).first(),
+      ]);
+      if (creatorBlockedInvitee || inviteeBlockedCreator) {
+        throw Object.assign(new Error("Cette interaction n’est pas autorisée."), {
+          statusCode: 403,
+        });
+      }
+    }
+    const challenge = await tx.orm.public.Challenge.create({
+      ...challengeData,
+      expiresAt: toTemporal(challengeData.expiresAt),
+    });
     const game = await tx.orm.public.Game.create({
       type: "CHALLENGE",
       status: "WAITING",
@@ -64,13 +88,13 @@ export async function createChallengeWithGame(
       currentFen: STANDARD_START_FEN,
       startedAt: null,
       endedAt: null,
-      lastActivityAt: new Date(),
+      lastActivityAt: toTemporal(new Date()),
       challengeId: challenge.id,
     });
     const participant = await tx.orm.public.GameParticipant.create({
       gameId: game.id,
       participantType: "USER",
-      color: "WHITE",
+      color: creatorColor,
       userId: challenge.creatorId,
       tournamentParticipantId: null,
       displayName: null,
@@ -103,18 +127,35 @@ export async function acceptPendingChallenge(
       .where({ id: challengeId, status: "PENDING", invitedUserId })
       .first();
     if (!challenge || epochMilliseconds(challenge.expiresAt) <= Date.now()) return null;
+    const [creatorBlockedInvitee, inviteeBlockedCreator] = await Promise.all([
+      tx.orm.public.BlockedUser.where({
+        blockerId: challenge.creatorId,
+        blockedUserId: invitedUserId,
+      }).first(),
+      tx.orm.public.BlockedUser.where({
+        blockerId: invitedUserId,
+        blockedUserId: challenge.creatorId,
+      }).first(),
+    ]);
+    if (creatorBlockedInvitee || inviteeBlockedCreator) return null;
 
     const acceptedChallenge = await tx.orm.public.Challenge
       .where({ id: challengeId, status: "PENDING", invitedUserId })
-      .update({ status: "ACCEPTED", acceptedAt: new Date() });
+      .update({ status: "ACCEPTED", acceptedAt: toTemporal(new Date()) });
     if (!acceptedChallenge) return null;
 
     const game = await tx.orm.public.Game.where({ challengeId }).first();
     if (!game) throw new Error(`Partie absente pour le défi ${challengeId}.`);
+    const creatorParticipant = await tx.orm.public.GameParticipant
+      .where({ gameId: game.id, userId: challenge.creatorId, participantType: "USER" })
+      .first();
+    if (!creatorParticipant) {
+      throw new Error(`Participant créateur absent pour le défi ${challengeId}.`);
+    }
     const participant = await tx.orm.public.GameParticipant.create({
       gameId: game.id,
       participantType: "USER",
-      color: "BLACK",
+      color: oppositeChessColor(creatorParticipant.color),
       userId: invitedUserId,
       tournamentParticipantId: null,
       displayName: null,
@@ -135,6 +176,8 @@ export async function acceptPendingChallenge(
 }
 
 type ChallengeClosedAction = "declined" | "cancelled" | "expired";
+
+const inFlightChallengeExpirations = new Set<number>();
 
 async function transitionPendingChallenge(
   challengeId: number,
@@ -227,7 +270,13 @@ export async function declinePendingChallenge(challengeId: number, invitedUserId
 }
 
 export async function expirePendingChallenge(challengeId: number) {
-  return transitionPendingChallenge(challengeId, {}, "EXPIRED", "expired");
+  if (inFlightChallengeExpirations.has(challengeId)) return null;
+  inFlightChallengeExpirations.add(challengeId);
+  try {
+    return await transitionPendingChallenge(challengeId, {}, "EXPIRED", "expired");
+  } finally {
+    inFlightChallengeExpirations.delete(challengeId);
+  }
 }
 
 export async function expireDuePendingChallenges(limit = 100) {

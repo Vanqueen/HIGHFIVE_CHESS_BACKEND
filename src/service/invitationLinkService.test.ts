@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Temporal } from "temporal-polyfill";
 
 const mocks = vi.hoisted(() => ({
   createChallengeInvitationLink: vi.fn(),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   findInvitationLink: vi.fn(),
   findInvitationLinkByTokenHash: vi.fn(),
   findUser: vi.fn(),
+  assertUsersCanInteract: vi.fn(),
   redeemChallengeInvitationLink: vi.fn(),
   publishMany: vi.fn(),
   publishGameBroadcast: vi.fn(),
@@ -32,6 +34,9 @@ vi.mock("../repository/challenge.repository", () => ({
 }));
 vi.mock("../repository/user.repository", () => ({
   findUser: mocks.findUser,
+}));
+vi.mock("./socialService", () => ({
+  SocialService: { assertUsersCanInteract: mocks.assertUsersCanInteract },
 }));
 vi.mock("./notificationService", () => ({
   NotificationService: { publishMany: mocks.publishMany },
@@ -83,6 +88,7 @@ describe("InvitationLinkService", () => {
       expiresAt: new Date(Date.now() + 10 * 60_000),
     });
     mocks.findUser.mockResolvedValue({ accountStatus: "ACTIVE", deletedAt: null });
+    mocks.assertUsersCanInteract.mockResolvedValue(undefined);
   });
 
   it("generates an opaque one-time token and stores only its hash", async () => {
@@ -93,6 +99,29 @@ describe("InvitationLinkService", () => {
     const [, , persistedHash] = mocks.createChallengeInvitationLink.mock.calls[0];
     expect(persistedHash).not.toBe(result.token);
     expect(persistedHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("generates a fresh encoded token for each link", async () => {
+    const first = await InvitationLinkService.createChallengeLink(3, 11);
+    const second = await InvitationLinkService.createChallengeLink(3, 11);
+
+    expect(first.token).not.toBe(second.token);
+    expect(first.token).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(second.token).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  it("keeps a Temporal.Instant challenge expiry as a Date for link persistence", async () => {
+    const challengeExpiry = Temporal.Instant.fromEpochMilliseconds(Date.now() + 5 * 60_000);
+    mocks.findChallenge.mockResolvedValue({
+      ...pendingChallenge,
+      expiresAt: challengeExpiry,
+    });
+
+    await InvitationLinkService.createChallengeLink(3, 11);
+
+    const expiresAt = mocks.createChallengeInvitationLink.mock.calls[0][3];
+    expect(expiresAt).toBeInstanceOf(Date);
+    expect(expiresAt.getTime()).toBeLessThanOrEqual(challengeExpiry.epochMilliseconds);
   });
 
   it("only allows the challenge creator to create a link", async () => {
@@ -110,6 +139,20 @@ describe("InvitationLinkService", () => {
     await expect(InvitationLinkService.createChallengeLink(3, 11))
       .rejects.toMatchObject({ statusCode: 410 });
     expect(mocks.expirePendingChallenge).toHaveBeenCalledWith(11);
+    expect(mocks.createChallengeInvitationLink).not.toHaveBeenCalled();
+  });
+
+  it("does not create a link for a directly invited user who is blocked", async () => {
+    mocks.findChallenge.mockResolvedValue({
+      ...pendingChallenge,
+      invitedUserId: 7,
+    });
+    mocks.assertUsersCanInteract.mockRejectedValue(
+      Object.assign(new Error("Cette interaction n’est pas autorisée."), { statusCode: 403 }),
+    );
+
+    await expect(InvitationLinkService.createChallengeLink(3, 11))
+      .rejects.toMatchObject({ statusCode: 403 });
     expect(mocks.createChallengeInvitationLink).not.toHaveBeenCalled();
   });
 

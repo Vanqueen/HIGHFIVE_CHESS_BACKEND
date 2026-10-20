@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import {
   acceptPendingChallenge,
   cancelPendingChallenge,
@@ -11,6 +12,7 @@ import {
 import { findGamesByChallenge } from "../repository/game.repository";
 import { findUser } from "../repository/user.repository";
 import { NotificationService } from "./notificationService";
+import { SocialService } from "./socialService";
 import {
   expireChallengeAndNotify,
   publishChallengeExpiration,
@@ -22,6 +24,8 @@ import HttpError, { rethrowServiceError } from "./errorService";
 const CHALLENGE_LIFETIME_MS = 30 * 60 * 1000;
 const MAX_INITIAL_TIME_SECONDS = 2 * 60 * 60;
 const MAX_INCREMENT_SECONDS = 180;
+type PlayerColor = "WHITE" | "BLACK";
+type ColorPreference = PlayerColor | "RANDOM";
 
 function assertTimeControl(initialTimeSeconds: number, incrementSeconds: number) {
   // Zero base time is the current contract for an untimed game and cannot have an increment.
@@ -50,9 +54,17 @@ export class ChallengeService {
     invitedUserId: number | null,
     initialTimeSeconds: number,
     incrementSeconds = 0,
+    colorPreference: ColorPreference = "RANDOM",
   ) {
     try {
       assertTimeControl(initialTimeSeconds, incrementSeconds);
+      if (
+        colorPreference !== "WHITE" &&
+        colorPreference !== "BLACK" &&
+        colorPreference !== "RANDOM"
+      ) {
+        throw new HttpError("Choix de couleur invalide.", 422, false);
+      }
       if (
         invitedUserId !== null &&
         (!Number.isSafeInteger(invitedUserId) || invitedUserId <= 0)
@@ -72,14 +84,18 @@ export class ChallengeService {
         if (!invitee || invitee.accountStatus !== "ACTIVE" || invitee.deletedAt !== null) {
           throw new HttpError("Joueur invité introuvable ou indisponible.", 404, false);
         }
+        await SocialService.assertUsersCanInteract(creatorId, invitedUserId);
       }
 
+      const creatorColor: PlayerColor = colorPreference === "RANDOM"
+        ? (randomInt(2) === 0 ? "WHITE" : "BLACK")
+        : colorPreference;
       const created = await createChallengeWithGame({
         creatorId,
         invitedUserId,
         status: "PENDING",
         expiresAt: new Date(Date.now() + CHALLENGE_LIFETIME_MS),
-      }, initialTimeSeconds, incrementSeconds, creator.username);
+      }, initialTimeSeconds, incrementSeconds, creator.username, creatorColor);
       NotificationService.publishMany(created.notifications);
       return {
         challenge: created.challenge,
@@ -138,6 +154,7 @@ export class ChallengeService {
         await this.expireChallenge(challengeId);
         throw new HttpError("Ce défi a expiré.", 410, false);
       }
+      await SocialService.assertUsersCanInteract(challenge.creatorId, userId);
 
       const accepted = await acceptPendingChallenge(challengeId, userId);
       if (!accepted) throw new HttpError("Le défi a déjà été traité ou a expiré.", 409, false);

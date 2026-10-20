@@ -23,6 +23,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function serializeGame(game: Record<string, unknown>) {
+  return JSON.parse(JSON.stringify(game, (_, v) =>
+    typeof v === "bigint" ? Number(v) : v
+  ));
+}
+
 async function requireGuestParticipantId(
   authorization: string | undefined,
   gameId: number,
@@ -65,7 +71,8 @@ export const GameController = {
 
   getGame: (async (request, response) => {
     requireCurrentUser(response);
-    response.status(200).json(await GameService.getGame(readParamId(request, "gameId")));
+    const games = await GameService.getGame(readParamId(request, "gameId"));
+    response.status(200).json(serializeBigInts(games));
   }) satisfies RequestHandler,
 
   getGamesForCurrentUser: (async (request, response) => {
@@ -83,7 +90,8 @@ export const GameController = {
         return;
       }
     }
-    response.status(200).json(await GameService.getGamesForUser(user.id, limit));
+    const games = await GameService.getGamesForUser(user.id, limit);
+    response.status(200).json(games.map(serializeGame));
   }) satisfies RequestHandler,
 
   playMove: (async (request, response) => {
@@ -174,10 +182,11 @@ export const GameController = {
 
   getMoves: (async (request, response) => {
     const user = requireCurrentUser(response);
-    response.status(200).json(await MoveService.getMoves(
+    const moves = await MoveService.getMoves(
       readParamId(request, "gameId"),
       user.id,
-    ));
+    )
+    response.status(200).json(moves);
   }) satisfies RequestHandler,
 
   getGuestMoves: (async (request, response) => {

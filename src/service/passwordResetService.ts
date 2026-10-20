@@ -15,6 +15,7 @@ import { digestMatches, resetDigest } from "../utils/hash.util";
 import { hashPassword, passwordValidation, verifyPassword } from "../utils/password";
 import HttpError, { rethrowServiceError } from "./errorService";
 import { sendPasswordResetCode } from "./emailService";
+import { epochMilliseconds } from "../utils/temporalDate.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESET_CODE_TTL_MS = 10 * 60 * 1000;
@@ -26,7 +27,7 @@ export class PasswordResetService {
     const codeHash = resetDigest(`code:${userId}`, String(code ?? ""));
     const resetCode = await findPasswordResetCodeByHash(userId, codeHash);
     if (!resetCode || resetCode.usedAt || !resetCode.expiresAt) return null;
-    if (resetCode.expiresAt.getTime() <= Date.now()) {
+    if (epochMilliseconds(resetCode.expiresAt) <= Date.now()) {
       await invalidatePasswordResetCode(resetCode.id);
       return null;
     }

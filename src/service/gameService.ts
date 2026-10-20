@@ -24,6 +24,11 @@ import HttpError, { rethrowServiceError } from "./errorService";
 
 type GameRecord = NonNullable<Awaited<ReturnType<typeof findGame>>>;
 type GameActor = { userId: number } | { participantId: number };
+type Timestamp = Date | { epochMilliseconds: number };
+
+function epochMilliseconds(value: Timestamp) {
+  return value instanceof Date ? value.getTime() : value.epochMilliseconds;
+}
 
 function findActorParticipant(
   participants: Awaited<ReturnType<typeof findGameParticipantsByGameId>>,
@@ -38,7 +43,7 @@ function findActorParticipant(
   );
 }
 
-function calculateClock(game: GameRecord, at = new Date()) {
+function calculateClock(game: GameRecord, at = Date.now()) {
   let white = game.whiteTimeRemainingMs;
   let black = game.blackTimeRemainingMs;
   if (
@@ -47,7 +52,7 @@ function calculateClock(game: GameRecord, at = new Date()) {
     game.activeColor &&
     game.clockStartedAt
   ) {
-    const elapsed = BigInt(Math.max(0, at.getTime() - game.clockStartedAt.getTime()));
+    const elapsed = BigInt(Math.max(0, at - epochMilliseconds(game.clockStartedAt)));
     if (game.activeColor === "WHITE") {
       white = white > elapsed ? white - elapsed : 0n;
     } else {
@@ -360,7 +365,7 @@ export class GameService {
         game.status !== "IN_PROGRESS" ||
         game.activeColor !== "WHITE" ||
         !game.startedAt ||
-        Date.now() - game.startedAt.getTime() < 60_000
+        Date.now() - epochMilliseconds(game.startedAt) < 60_000
       ) {
         throw new HttpError("Le délai d'absence d'une minute n'est pas encore atteint.", 409, false);
       }

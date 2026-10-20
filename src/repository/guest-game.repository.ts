@@ -1,4 +1,5 @@
 import { db } from "../prisma/db.ts";
+import { toTemporal } from "../utils/temporalDate.ts";
 
 const STANDARD_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -22,7 +23,7 @@ export async function createAnonymousGame(
       currentFen: STANDARD_START_FEN,
       startedAt: null,
       endedAt: null,
-      lastActivityAt: now,
+      lastActivityAt: toTemporal(now),
       challengeId: null,
       tournamentRoundId: null,
     });
@@ -38,7 +39,7 @@ export async function createAnonymousGame(
   });
 }
 
-export async function joinAnonymousGame(gameId: number) {
+export async function joinAnonymousGame(gameId: number, userId: number | null = null) {
   return db.transaction(async (tx) => {
     const game = await tx.orm.public.Game.where({ id: gameId }).first();
     if (!game || game.status !== "WAITING") return null;
@@ -48,9 +49,9 @@ export async function joinAnonymousGame(gameId: number) {
     // The unique game/color constraint makes the vacant seat a one-time invitation.
     const participant = await tx.orm.public.GameParticipant.create({
       gameId,
-      participantType: "GUEST",
+      participantType: userId === null ? "GUEST" : "USER",
       color: "BLACK",
-      userId: null,
+      userId,
       tournamentParticipantId: null,
       displayName: null,
     });

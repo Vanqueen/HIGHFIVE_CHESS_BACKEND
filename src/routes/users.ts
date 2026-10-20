@@ -4,9 +4,11 @@ import { authenticate, requireRole } from "../middlewares/auth.middleware";
 
 const usersRouter = Router();
 
+usersRouter.get("/public/:userId", UserController.getPublicProfile);
 usersRouter.use(authenticate);
 
 usersRouter.get("/", requireRole("ADMIN"), UserController.getAllUsers);
+usersRouter.get("/search", UserController.searchUsers);
 usersRouter.get("/me/statistics", UserController.getMyStatistics);
 usersRouter.get("/me", authenticate, async (req, res) => {
   try {

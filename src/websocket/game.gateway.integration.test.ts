@@ -7,11 +7,14 @@ import { GAME_ACTIONS, GAME_EVENTS } from "../events/game.events";
 import { GAME_CHAT_EVENTS } from "../events/gameChat.events";
 import { MOVE_EVENTS } from "../events/move.events";
 import { publishNotification } from "../events/notification.broadcast";
+import { getMessageEvents, PRIVATE_MESSAGE_EVENTS } from "../events/message.events";
+import { Temporal } from "temporal-polyfill";
 
 const mocks = vi.hoisted(() => ({
   authenticateAccessToken: vi.fn(),
   authenticateGuestSession: vi.fn(),
   getClock: vi.fn(),
+  getConversationInfo: vi.fn(),
   getGameForGuest: vi.fn(),
   getGameForUser: vi.fn(),
   getMessages: vi.fn(),
@@ -20,6 +23,8 @@ const mocks = vi.hoisted(() => ({
   getMoves: vi.fn(),
   offerDrawAsParticipant: vi.fn(),
   sendMessageAsGuest: vi.fn(),
+  markConversationRead: vi.fn(),
+  sendPrivateMessage: vi.fn(),
   playMoveAsParticipant: vi.fn(),
   setOffline: vi.fn(),
   setOnline: vi.fn(),
@@ -61,6 +66,13 @@ vi.mock("../service/gameChatService", () => ({
     getMessages: mocks.getMessages,
     getMessagesForGuest: mocks.getMessagesForGuest,
     sendMessageAsGuest: mocks.sendMessageAsGuest,
+  },
+}));
+vi.mock("../service/messageService", () => ({
+  MessageService: {
+    getConversationInfo: mocks.getConversationInfo,
+    markAsRead: mocks.markConversationRead,
+    sendMessage: mocks.sendPrivateMessage,
   },
 }));
 vi.mock("../service/userPresenceService", () => ({
@@ -166,6 +178,78 @@ describe("game gateway integration", () => {
     expect(mocks.getGameForUser).toHaveBeenCalledWith(41, 7);
   });
 
+  it("authorizes private conversation rooms and relays private messages", async () => {
+    mocks.authenticateAccessToken.mockResolvedValue({
+      id: 7,
+      email: "player@example.test",
+      role: "USER",
+      sessionId: 9,
+    });
+    mocks.setOnline.mockResolvedValue(true);
+    mocks.getConversationInfo.mockResolvedValue({ conversation: { id: 25 } });
+    mocks.markConversationRead.mockResolvedValue({ conversationId: 25 });
+    const message = {
+      id: 91,
+      conversationId: 25,
+      senderId: 7,
+      content: "Bonjour",
+    };
+    mocks.sendPrivateMessage.mockImplementation(async () => {
+      getMessageEvents().emitNewMessage(25, message);
+      return message;
+    });
+
+    const httpServer = createServer();
+    const ioServer = attachGameGateway(httpServer);
+    closeGateway = () => new Promise((resolve) => ioServer.close(() => resolve()));
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const address = httpServer.address();
+    if (!address || typeof address === "string") throw new Error("Adresse HTTP indisponible.");
+
+    client = createClient(`http://127.0.0.1:${address.port}`, {
+      auth: { accessToken: "test-access-token" },
+      forceNew: true,
+      reconnection: false,
+    });
+    await new Promise<void>((resolve, reject) => {
+      client?.once("connect", resolve);
+      client?.once("connect_error", reject);
+    });
+
+    const joined = new Promise<{ success: boolean }>((resolve) => {
+      client?.emit(PRIVATE_MESSAGE_EVENTS.JOIN, { conversationId: 25 }, resolve);
+    });
+    await expect(joined).resolves.toMatchObject({ success: true });
+    expect(mocks.getConversationInfo).toHaveBeenCalledWith(25, 7);
+    expect(mocks.markConversationRead).toHaveBeenCalledWith(25, 7);
+
+    const receivedMessage = new Promise<{
+      message: { id: number; content: string };
+    }>((resolve) => client?.once(PRIVATE_MESSAGE_EVENTS.NEW_MESSAGE, resolve));
+    const sent = new Promise<{ success: boolean; data: typeof message }>((resolve) => {
+      client?.emit(
+        PRIVATE_MESSAGE_EVENTS.SEND,
+        { conversationId: 25, content: "Bonjour" },
+        resolve,
+      );
+    });
+    await expect(sent).resolves.toMatchObject({ success: true, data: message });
+    await expect(receivedMessage).resolves.toMatchObject({ message });
+
+    mocks.getConversationInfo.mockRejectedValueOnce(
+      Object.assign(new Error("Vous ne participez pas à cette conversation."), {
+        statusCode: 403,
+      }),
+    );
+    const deniedJoin = new Promise<{ success: boolean; error: string }>((resolve) => {
+      client?.emit(PRIVATE_MESSAGE_EVENTS.JOIN, { conversationId: 26 }, resolve);
+    });
+    await expect(deniedJoin).resolves.toMatchObject({
+      success: false,
+      error: "Vous ne participez pas à cette conversation.",
+    });
+  }, 15_000);
+
   it("lets a guest join only its assigned game without creating user presence", async () => {
     mocks.verifyGuestGameToken.mockReturnValue({
       kind: "guest-session",
@@ -242,12 +326,13 @@ describe("game gateway integration", () => {
       title: "Partie terminée",
       content: "La partie est terminée.",
       data: { gameId: 41 },
-      createdAt: new Date(),
+      createdAt: Temporal.Instant.fromEpochMilliseconds(Date.now()),
     });
     await expect(guestNotification).resolves.toMatchObject({
       id: 91,
       guestParticipantId: 51,
       type: "GAME_FINISHED",
+      createdAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
     });
 
     const moveAcknowledgement = new Promise<{ success: boolean }>((resolve) => {

@@ -11,6 +11,21 @@ import {
 } from "./controller.utils";
 
 export const UserController = {
+  getPublicProfile: (async (request, response) => {
+    response.status(200).json(await UserService.getPublicProfile(
+      readParamId(request, "userId"),
+    ));
+  }) satisfies RequestHandler,
+
+  searchUsers: (async (request, response) => {
+    const username = request.query.username;
+    if (typeof username !== "string") {
+      response.status(422).json({ success: false, message: "Pseudonyme de recherche requis." });
+      return;
+    }
+    response.status(200).json(await UserService.searchActiveUsers(username));
+  }) satisfies RequestHandler,
+
   getAllUsers: (async (_request, response) => {
     requireAdmin(response);
     response.status(200).json(await UserService.getAllUsers());

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   findUserByEmail: vi.fn(),
   findUserByUsername: vi.fn(),
   findUsers: vi.fn(),
+  searchActiveUsers: vi.fn(),
   restoreDeletedAccount: vi.fn(),
   savePendingEmailChange: vi.fn(),
   sendEmailChangeCode: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock("../repository/user.repository", () => ({
   findUserByEmail: mocks.findUserByEmail,
   findUserByUsername: mocks.findUserByUsername,
   findUsers: mocks.findUsers,
+  searchActiveUsers: mocks.searchActiveUsers,
   permanentlyDeleteUser: mocks.deleteUserRecord,
   savePendingEmailChange: mocks.savePendingEmailChange,
   updateAvatar: mocks.updateAvatar,
@@ -137,6 +139,35 @@ describe("UserService account changes", () => {
     mocks.findUser.mockResolvedValue(makeUser({ deletedAt: new Date() }));
 
     await expect(UserService.getUserById(7)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("searches active players by a bounded username query", async () => {
+    const players = [{ id: 7, username: "Joueur", avatarUrl: null }];
+    mocks.searchActiveUsers.mockResolvedValue(players);
+
+    await expect(UserService.searchActiveUsers("  jou  ")).resolves.toEqual(players);
+    expect(mocks.searchActiveUsers).toHaveBeenCalledWith("jou", 10);
+  });
+
+  it("rejects username searches that are too short", async () => {
+    await expect(UserService.searchActiveUsers(" x ")).rejects.toMatchObject({ status: 422 });
+    expect(mocks.searchActiveUsers).not.toHaveBeenCalled();
+  });
+
+  it("returns only safe public profile fields for active users", async () => {
+    mocks.findUser.mockResolvedValue(makeUser());
+
+    await expect(UserService.getPublicProfile(7)).resolves.toEqual({
+      id: 7,
+      username: "joueur",
+      avatarUrl: null,
+    });
+  });
+
+  it("hides inactive player profiles", async () => {
+    mocks.findUser.mockResolvedValue(makeUser({ accountStatus: "SUSPENDED" }));
+
+    await expect(UserService.getPublicProfile(7)).rejects.toMatchObject({ status: 404 });
   });
 
   it("requires an active administrator to change a user's role", async () => {

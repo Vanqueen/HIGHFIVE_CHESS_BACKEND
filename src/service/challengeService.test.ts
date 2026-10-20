@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   findChallengesByInvitee: vi.fn(),
   findGamesByChallenge: vi.fn(),
   findUser: vi.fn(),
+  assertUsersCanInteract: vi.fn(),
   publishGameBroadcast: vi.fn(),
   publishMany: vi.fn(),
 }));
@@ -28,6 +29,9 @@ vi.mock("../repository/challenge.repository", () => ({
 }));
 vi.mock("../repository/user.repository", () => ({
   findUser: mocks.findUser,
+}));
+vi.mock("./socialService", () => ({
+  SocialService: { assertUsersCanInteract: mocks.assertUsersCanInteract },
 }));
 vi.mock("../repository/game.repository", () => ({
   findGamesByChallenge: mocks.findGamesByChallenge,
@@ -53,6 +57,7 @@ describe("ChallengeService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.findUser.mockResolvedValue(activeUser);
+    mocks.assertUsersCanInteract.mockResolvedValue(undefined);
     mocks.findGamesByChallenge.mockResolvedValue([]);
     mocks.createChallengeWithGame.mockResolvedValue({
       challenge: { id: 10 },
@@ -78,6 +83,7 @@ describe("ChallengeService", () => {
       0,
       0,
       "test-user",
+      expect.stringMatching(/^(WHITE|BLACK)$/),
     );
   });
 
@@ -92,7 +98,30 @@ describe("ChallengeService", () => {
       600,
       5,
       "test-user",
+      expect.stringMatching(/^(WHITE|BLACK)$/),
     );
+  });
+
+  it.each(["WHITE", "BLACK"] as const)(
+    "preserves the creator's explicit %s color choice",
+    async (color) => {
+      await ChallengeService.createChallenge(3, 8, 300, 0, color);
+
+      expect(mocks.createChallengeWithGame).toHaveBeenCalledWith(
+        expect.any(Object),
+        300,
+        0,
+        "test-user",
+        color,
+      );
+    },
+  );
+
+  it("rejects an unsupported color preference", async () => {
+    await expect(
+      ChallengeService.createChallenge(3, 8, 300, 0, "GREEN" as "WHITE"),
+    ).rejects.toMatchObject({ statusCode: 422 });
+    expect(mocks.createChallengeWithGame).not.toHaveBeenCalled();
   });
 
   it("rejects self-challenges and invalid unlimited clock increments", async () => {
@@ -108,9 +137,18 @@ describe("ChallengeService", () => {
       ...activeUser,
       accountStatus: "SUSPENDED",
     });
-
     await expect(ChallengeService.createChallenge(3, 8, 300, 0))
       .rejects.toMatchObject({ statusCode: 404 });
+    expect(mocks.createChallengeWithGame).not.toHaveBeenCalled();
+  });
+
+  it("rejects a direct challenge when either user has blocked the other", async () => {
+    mocks.assertUsersCanInteract.mockRejectedValue(
+      Object.assign(new Error("Cette interaction n’est pas autorisée."), { statusCode: 403 }),
+    );
+
+    await expect(ChallengeService.createChallenge(3, 8, 300, 0))
+      .rejects.toMatchObject({ statusCode: 403 });
     expect(mocks.createChallengeWithGame).not.toHaveBeenCalled();
   });
 

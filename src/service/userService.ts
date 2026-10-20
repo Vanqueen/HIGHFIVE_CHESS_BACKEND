@@ -13,6 +13,7 @@ import {
   findUserByEmail,
   findUserByUsername,
   findUsers,
+  searchActiveUsers,
   permanentlyDeleteUser as deleteUserRecord,
   savePendingEmailChange,
   updateAvatar,
@@ -28,6 +29,7 @@ import {
 } from "../repository/account.repository";
 import { digestMatches, resetDigest } from "../utils/hash.util";
 import { sendEmailChangeCode } from "./emailService";
+import { epochMilliseconds } from "../utils/temporalDate.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_CHANGE_TTL_MS = 10 * 60 * 1000;
@@ -74,6 +76,30 @@ function detectImageMimeType(data: Buffer) {
 }
 
 export class UserService {
+  static async searchActiveUsers(username: string) {
+    try {
+      const query = username.trim();
+      if (query.length < 2 || query.length > 30) {
+        throw new HttpError("Le pseudonyme doit contenir entre 2 et 30 caractères.", 422, false);
+      }
+      return searchActiveUsers(query, 10);
+    } catch (error) {
+      rethrowServiceError(error, "Erreur lors de la recherche de joueurs :");
+    }
+  }
+
+  static async getPublicProfile(userId: number) {
+    try {
+      const user = await findUser(userId);
+      if (!user || user.accountStatus !== "ACTIVE" || user.deletedAt !== null) {
+        throw new HttpError("Joueur introuvable.", 404, false);
+      }
+      return { id: user.id, username: user.username, avatarUrl: user.avatarUrl };
+    } catch (error) {
+      rethrowServiceError(error, "Erreur lors de la récupération du profil public :");
+    }
+  }
+
   static async getAllUsers() {
     try {
       const users = await findUsers();
@@ -189,7 +215,7 @@ export class UserService {
         !user.pendingEmail ||
         !user.emailChangeCodeHash ||
         !user.emailChangeExpiresAt ||
-        user.emailChangeExpiresAt.getTime() <= Date.now()
+        epochMilliseconds(user.emailChangeExpiresAt) <= Date.now()
       ) {
         throw new HttpError("Code invalide ou expiré. Demandez un nouveau code.", 400, false);
       }

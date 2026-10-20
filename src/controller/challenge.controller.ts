@@ -23,7 +23,11 @@ export const ChallengeController = {
       (body.incrementSeconds !== undefined &&
         (typeof body.incrementSeconds !== "number" ||
           !Number.isSafeInteger(body.incrementSeconds) ||
-          body.incrementSeconds < 0))
+          body.incrementSeconds < 0)) ||
+      (body.colorPreference !== undefined &&
+        body.colorPreference !== "WHITE" &&
+        body.colorPreference !== "BLACK" &&
+        body.colorPreference !== "RANDOM")
     ) {
       response.status(422).json({ success: false, message: "Données de défi invalides." });
       return;
@@ -34,6 +38,9 @@ export const ChallengeController = {
       typeof body.invitedUserId === "number" ? body.invitedUserId : null,
       body.initialTimeSeconds,
       typeof body.incrementSeconds === "number" ? body.incrementSeconds : 0,
+      typeof body.colorPreference === "string"
+        ? body.colorPreference as "WHITE" | "BLACK" | "RANDOM"
+        : "RANDOM",
     )));
   }) satisfies RequestHandler,
 

@@ -1,4 +1,5 @@
 import { db } from "../prisma/db.ts";
+import { toTemporal } from "../utils/temporalDate.ts";
 
 // ─── Read ────────────────────────────────────────────────────────────────────
 
@@ -20,8 +21,8 @@ export async function createPasswordResetCode(userId: number, codeHash: string, 
   return db.orm.public.PasswordResetCode.create({
     userId,
     codeHash,
-    expiresAt,
-    createdAt: new Date(),
+    expiresAt: toTemporal(expiresAt),
+    createdAt: toTemporal(new Date()),
   });
 }
 
@@ -32,12 +33,12 @@ export async function replaceActivePasswordResetCode(
 ) {
   return db.transaction(async (tx) => {
     await tx.orm.public.PasswordResetCode.where({ userId, usedAt: null })
-      .update({ usedAt: new Date() });
+      .update({ usedAt: toTemporal(new Date()) });
     return tx.orm.public.PasswordResetCode.create({
       userId,
       codeHash,
-      expiresAt,
-      createdAt: new Date(),
+      expiresAt: toTemporal(expiresAt),
+      createdAt: toTemporal(new Date()),
     });
   });
 }
@@ -45,11 +46,13 @@ export async function replaceActivePasswordResetCode(
 // ─── Invalidate ───────────────────────────────────────────────────────────────
 
 export async function invalidatePasswordResetCode(id: number) {
-  return db.orm.public.PasswordResetCode.where({ id }).update({ usedAt: new Date() });
+  return db.orm.public.PasswordResetCode.where({ id })
+    .update({ usedAt: toTemporal(new Date()) });
 }
 
 export async function invalidateAllPasswordResetCodes(userId: number) {
-  return db.orm.public.PasswordResetCode.where({ userId, usedAt: null }).update({ usedAt: new Date() });
+  return db.orm.public.PasswordResetCode.where({ userId, usedAt: null })
+    .update({ usedAt: toTemporal(new Date()) });
 }
 
 // ─── Delete ───────────────────────────────────────────────────────────────────
@@ -59,5 +62,5 @@ export async function deletePasswordResetCode(id: number) {
 }
 
 export async function deleteExpiredPasswordResetCodes(before: Date) {
-  return db.orm.public.PasswordResetCode.where({ expiresAt: before }).delete();
+  return db.orm.public.PasswordResetCode.where({ expiresAt: toTemporal(before) }).delete();
 }

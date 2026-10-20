@@ -1,4 +1,5 @@
 import { db } from "../prisma/db.ts";
+import { toTemporal } from "../utils/temporalDate.ts";
 
 export async function findOrCreateGameConversation(gameId: number, userIds: number[]) {
   return db.transaction(async (tx) => {
@@ -10,7 +11,7 @@ export async function findOrCreateGameConversation(gameId: number, userIds: numb
       conversation = await tx.orm.public.Conversation.create({
         gameId,
         type: "GAME",
-        createdAt: new Date(),
+        createdAt: toTemporal(new Date()),
       });
     }
 
@@ -23,7 +24,7 @@ export async function findOrCreateGameConversation(gameId: number, userIds: numb
       await tx.orm.public.ConversationParticipant.create({
         conversationId: conversation.id,
         userId,
-        joinedAt: new Date(),
+        joinedAt: toTemporal(new Date()),
       });
     }
     return conversation;
@@ -54,7 +55,7 @@ export async function createGameMessage(
       conversation = await tx.orm.public.Conversation.create({
         gameId,
         type: "GAME",
-        createdAt: new Date(),
+        createdAt: toTemporal(new Date()),
       });
     }
 
@@ -67,7 +68,7 @@ export async function createGameMessage(
       await tx.orm.public.ConversationParticipant.create({
         conversationId: conversation.id,
         userId,
-        joinedAt: new Date(),
+        joinedAt: toTemporal(new Date()),
       });
     }
 
@@ -76,7 +77,7 @@ export async function createGameMessage(
       senderId,
       content,
       messageType: "TEXT",
-      createdAt: new Date(),
+      createdAt: toTemporal(new Date()),
     });
   });
 }

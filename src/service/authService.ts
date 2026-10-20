@@ -19,11 +19,12 @@ import { hashPassword, passwordValidation, verifyPassword } from "../utils/passw
 import { generateToken, hashToken, verifyTokenHash } from "../utils/token";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import HttpError, { rethrowServiceError } from "./errorService";
+import { parseTtl } from "../utils/time";
 
 export class AuthService {
   private static tokenLifetimes() {
-    const accessTtlSeconds = Number(process.env.JWT_ACCESS_EXPIRES_IN ?? 900);
-    const refreshTtlSeconds = Number(process.env.JWT_REFRESH_EXPIRES_IN);
+    const accessTtlSeconds = parseTtl(process.env.JWT_ACCESS_EXPIRES_IN, 900);
+    const refreshTtlSeconds = parseTtl(process.env.JWT_REFRESH_EXPIRES_IN, 604800);
     if (!Number.isFinite(accessTtlSeconds) || accessTtlSeconds <= 0) {
       throw new Error("JWT_ACCESS_EXPIRES_IN must be a positive number");
     }

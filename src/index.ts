@@ -12,6 +12,8 @@ import challengesRouter from "./routes/challenges";
 import invitationLinksRouter from "./routes/invitation-links";
 import tournamentsRouter from "./routes/tournaments";
 import usersRouter from "./routes/users";
+import socialRouter from "./routes/social";
+import conversationsRouter from "./routes/conversations";
 import { errorHandler } from "./middlewares/error.middleware";
 import { authApiRateLimit } from "./middlewares/auth-rate-limit.middleware";
 import { attachGameGateway } from "./websocket/game.gateway";
@@ -67,6 +69,8 @@ async function startServer() {
   });
   app.use("/api/auth", authRouter);
   app.use("/api/users", usersRouter);
+  app.use("/api", socialRouter);
+  app.use("/api/conversations", conversationsRouter);
   app.use("/api/games", gameRouter);
   app.use("/api/challenges", challengesRouter);
   app.use("/api/invitation-links", invitationLinksRouter);

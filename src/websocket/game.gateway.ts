@@ -4,19 +4,40 @@ import { getWebSocketConfig } from "../config/websocket.config";
 import { CONNECTION_EVENTS } from "../events/connection.events";
 import { GAME_ACTIONS, GAME_EVENTS } from "../events/game.events";
 import { GAME_CHAT_EVENTS } from "../events/gameChat.events";
+import { MessageBroadcastService } from "../service/messageBroadcastService";
 import { subscribeToGameBroadcasts } from "../events/game.broadcast";
 import { subscribeToNotifications } from "../events/notification.broadcast";
 import { MOVE_EVENTS } from "../events/move.events";
+import { initializeMessageEvents, PRIVATE_MESSAGE_EVENTS } from "../events/message.events";
 import { authenticateAccessToken } from "../middlewares/auth.middleware";
 import { AnonymousGameService } from "../service/anonymousGameService";
 import { GameService } from "../service/gameService";
 import { MoveService } from "../service/moveService";
 import { GameChatService } from "../service/gameChatService";
+import { MessageService } from "../service/messageService";
 import { UserPresenceService } from "../service/userPresenceService";
 import { SocketPresenceRegistry } from "./socket-presence.registry";
 import { verifyGuestGameToken } from "../utils/guestGameToken";
 
 interface ClientToServerEvents {
+  [PRIVATE_MESSAGE_EVENTS.JOIN]: (
+    payload: { conversationId: number },
+    acknowledge?: Acknowledge,
+  ) => void;
+  [PRIVATE_MESSAGE_EVENTS.LEAVE]: (
+    payload: { conversationId: number },
+    acknowledge?: Acknowledge,
+  ) => void;
+  [PRIVATE_MESSAGE_EVENTS.SEND]: (
+    payload: { conversationId: number; content: string },
+    acknowledge?: Acknowledge,
+  ) => void;
+  [PRIVATE_MESSAGE_EVENTS.TYPING_START]: (
+    payload: { conversationId: number },
+  ) => void;
+  [PRIVATE_MESSAGE_EVENTS.TYPING_STOP]: (
+    payload: { conversationId: number },
+  ) => void;
   [CONNECTION_EVENTS.JOIN_GAME]: (payload: { gameId: number }, acknowledge?: Acknowledge) => void;
   [CONNECTION_EVENTS.LEAVE_GAME]: (payload: { gameId: number }, acknowledge?: Acknowledge) => void;
   [MOVE_EVENTS.PLAY]: (
@@ -61,6 +82,14 @@ type PersistedMove = Extract<
 type GameChatMessage = Awaited<ReturnType<typeof GameChatService.getMessages>>[number];
 
 interface ServerToClientEvents {
+  [PRIVATE_MESSAGE_EVENTS.NEW_MESSAGE]: (payload: unknown) => void;
+  [PRIVATE_MESSAGE_EVENTS.EDITED]: (payload: unknown) => void;
+  [PRIVATE_MESSAGE_EVENTS.DELETED]: (payload: unknown) => void;
+  [PRIVATE_MESSAGE_EVENTS.READ]: (payload: unknown) => void;
+  [PRIVATE_MESSAGE_EVENTS.USER_JOINED]: (payload: unknown) => void;
+  [PRIVATE_MESSAGE_EVENTS.USER_LEFT]: (payload: unknown) => void;
+  [PRIVATE_MESSAGE_EVENTS.TYPING]: (payload: unknown) => void;
+  [PRIVATE_MESSAGE_EVENTS.STOPPED_TYPING]: (payload: unknown) => void;
   [GAME_EVENTS.STATE]: (payload: Omit<GameSnapshot, "game"> & {
     moves: Awaited<ReturnType<typeof MoveService.getMoves>>;
     messages: GameChatMessage[];
@@ -121,6 +150,10 @@ function serializePayload(value: unknown): unknown {
   if (typeof value === "bigint") return value.toString();
   if (Array.isArray(value)) return value.map(serializePayload);
   if (value && typeof value === "object" && !(value instanceof Date)) {
+    const epochMilliseconds = Reflect.get(value, "epochMilliseconds");
+    if (typeof epochMilliseconds === "number") {
+      return new Date(epochMilliseconds).toISOString();
+    }
     return Object.fromEntries(
       Object.entries(value).map(([key, nested]) => [key, serializePayload(nested)]),
     );
@@ -171,6 +204,7 @@ export function attachGameGateway(httpServer: HttpServer) {
       maxHttpBufferSize: config.maxHttpBufferSize,
     },
   );
+  initializeMessageEvents(io);
   const unsubscribeBroadcasts = subscribeToGameBroadcasts((event) => {
     const room = `game:${event.gameId}`;
     if (event.type === "updated") {
@@ -343,6 +377,109 @@ export function attachGameGateway(httpServer: HttpServer) {
       void check.catch(() => userSocket.disconnect(true));
     }, config.sessionValidationIntervalMs);
     sessionCheck.unref();
+
+    userSocket.on(PRIVATE_MESSAGE_EVENTS.JOIN, async (payload, acknowledge) => {
+      try {
+        const conversationId = readPositiveId(payload?.conversationId);
+        if (conversationId === null) {
+          throw Object.assign(new Error("Identifiant de conversation invalide."), {
+            statusCode: 422,
+          });
+        }
+        await authenticateAccessToken(userSocket.data.accessToken);
+        await MessageService.getConversationInfo(conversationId, userSocket.data.userId);
+        await userSocket.join(`conversation:${conversationId}`);
+        await MessageService.markAsRead(conversationId, userSocket.data.userId);
+        await MessageBroadcastService.broadcastUserJoinedConversation(
+          conversationId,
+          userSocket.data.userId,
+        );
+        acknowledge?.({ success: true, data: { conversationId } });
+      } catch (error) {
+        acknowledgeError(error, acknowledge);
+      }
+    });
+
+    userSocket.on(PRIVATE_MESSAGE_EVENTS.LEAVE, async (payload, acknowledge) => {
+      const conversationId = readPositiveId(payload?.conversationId);
+      if (conversationId === null) {
+        acknowledgeError(
+          Object.assign(new Error("Identifiant de conversation invalide."), { statusCode: 422 }),
+          acknowledge,
+        );
+        return;
+      }
+      const room = `conversation:${conversationId}`;
+      if (!userSocket.rooms.has(room)) {
+        acknowledge?.({ success: true, data: { conversationId } });
+        return;
+      }
+      try {
+        await authenticateAccessToken(userSocket.data.accessToken);
+        await userSocket.leave(room);
+        await MessageBroadcastService.broadcastUserLeftConversation(
+          conversationId,
+          userSocket.data.userId,
+        );
+        acknowledge?.({ success: true, data: { conversationId } });
+      } catch (error) {
+        acknowledgeError(error, acknowledge);
+      }
+    });
+
+    userSocket.on(PRIVATE_MESSAGE_EVENTS.SEND, async (payload, acknowledge) => {
+      try {
+        const conversationId = readPositiveId(payload?.conversationId);
+        if (conversationId === null) {
+          throw Object.assign(new Error("Identifiant de conversation invalide."), {
+            statusCode: 422,
+          });
+        }
+        await authenticateAccessToken(userSocket.data.accessToken);
+        const message = await MessageService.sendMessage(
+          conversationId,
+          userSocket.data.userId,
+          payload.content,
+        );
+        acknowledge?.({ success: true, data: serializePayload(message) });
+      } catch (error) {
+        acknowledgeError(error, acknowledge);
+      }
+    });
+
+    const broadcastTyping = async (
+      payload: { conversationId: number },
+      started: boolean,
+    ) => {
+      const conversationId = readPositiveId(payload?.conversationId);
+      if (conversationId === null) return;
+      const room = `conversation:${conversationId}`;
+      if (!userSocket.rooms.has(room)) return;
+      try {
+        await authenticateAccessToken(userSocket.data.accessToken);
+        await MessageService.getConversationInfo(conversationId, userSocket.data.userId);
+        if (started) {
+          await MessageBroadcastService.broadcastUserTyping(
+            conversationId,
+            userSocket.data.userId,
+          );
+        } else {
+          await MessageBroadcastService.broadcastUserStoppedTyping(
+            conversationId,
+            userSocket.data.userId,
+          );
+        }
+      } catch (error) {
+        acknowledgeError(error);
+        await userSocket.leave(room);
+      }
+    };
+    userSocket.on(PRIVATE_MESSAGE_EVENTS.TYPING_START, (payload) => {
+      void broadcastTyping(payload, true);
+    });
+    userSocket.on(PRIVATE_MESSAGE_EVENTS.TYPING_STOP, (payload) => {
+      void broadcastTyping(payload, false);
+    });
 
     userSocket.on(CONNECTION_EVENTS.JOIN_GAME, async (payload, acknowledge) => {
       let gameId: number | null = null;
@@ -718,6 +855,14 @@ export function attachGameGateway(httpServer: HttpServer) {
         });
       }
       for (const room of userSocket.rooms) {
+        const conversationMatch = /^conversation:(\d+)$/.exec(room);
+        if (conversationMatch) {
+          void MessageBroadcastService.broadcastUserLeftConversation(
+            Number(conversationMatch[1]),
+            userSocket.data.userId,
+          );
+          continue;
+        }
         const match = /^game:(\d+)$/.exec(room);
         if (!match) continue;
         const gameId = Number(match[1]);

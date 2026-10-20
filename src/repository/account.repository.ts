@@ -1,4 +1,5 @@
 import { db } from "../prisma/db.ts";
+import { epochMilliseconds, toTemporal } from "../utils/temporalDate.ts";
 
 export class AccountRepositoryError extends Error {
   readonly statusCode: number;
@@ -46,23 +47,23 @@ export async function createAuthenticatedSession(
     }
 
     const now = new Date();
-    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: now });
-    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: now });
+    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
+    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
     const session = await tx.orm.public.Session.create({
       userId,
-      expiresAt,
-      createdAt: now,
-      lastActivityAt: now,
+      expiresAt: toTemporal(expiresAt),
+      createdAt: toTemporal(now),
+      lastActivityAt: toTemporal(now),
     });
     await tx.orm.public.RefreshToken.create({
       userId,
       sessionId: session.id,
       tokenHash,
-      expiresAt,
-      createdAt: now,
+      expiresAt: toTemporal(expiresAt),
+      createdAt: toTemporal(now),
     });
     await tx.orm.public.User.where({ id: userId }).update({
-      lastLoginAt: now,
+      lastLoginAt: toTemporal(now),
       failedLoginAttempts: 0,
       lockedUntil: null,
     });
@@ -81,8 +82,8 @@ export async function logoutAccount(userId: number) {
 
     const now = new Date();
     await tx.orm.public.User.where({ id: userId }).update({ connectionStatus: "OFFLINE" });
-    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: now });
-    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: now });
+    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
+    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
   });
 }
 
@@ -100,8 +101,8 @@ export async function updateAccountStatus(
     });
     if (accountStatus !== "ACTIVE") {
       const now = new Date();
-      await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: now });
-      await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: now });
+      await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
+      await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
     }
     return tx.orm.public.User.where({ id: userId }).first();
   });
@@ -117,14 +118,14 @@ export async function softDeleteAccount(userId: number) {
 
     const now = new Date();
     await tx.orm.public.User.where({ id: userId }).update({
-      deletedAt: now,
+      deletedAt: toTemporal(now),
       connectionStatus: "OFFLINE",
       pendingEmail: null,
       emailChangeCodeHash: null,
       emailChangeExpiresAt: null,
     });
-    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: now });
-    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: now });
+    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
+    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
   });
 }
 
@@ -141,8 +142,8 @@ export async function updateAccountRoleAndRevokeSessions(
       role,
       connectionStatus: "OFFLINE",
     });
-    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: now });
-    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: now });
+    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
+    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
     return tx.orm.public.User.where({ id: userId }).first();
   });
 }
@@ -160,8 +161,8 @@ export async function restoreDeletedAccount(userId: number) {
       deletedAt: null,
       connectionStatus: "OFFLINE",
     });
-    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: now });
-    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: now });
+    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
+    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
     return tx.orm.public.User.where({ id: userId }).first();
   });
 }
@@ -190,9 +191,9 @@ export async function updatePasswordAndRevokeSessions(
       lockedUntil: null,
       failedLoginAttempts: 0,
     });
-    await tx.orm.public.PasswordResetCode.where({ userId, usedAt: null }).update({ usedAt: now });
-    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: now });
-    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: now });
+    await tx.orm.public.PasswordResetCode.where({ userId, usedAt: null }).update({ usedAt: toTemporal(now) });
+    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
+    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
   });
 }
 
@@ -211,18 +212,18 @@ export async function resetPasswordWithCode(
     const resetCode = await tx.orm.public.PasswordResetCode
       .where({ id: resetCodeId, userId, usedAt: null })
       .first();
-    if (!resetCode || resetCode.expiresAt.getTime() <= Date.now()) {
+    if (!resetCode || epochMilliseconds(resetCode.expiresAt) <= Date.now()) {
       throw new AccountRepositoryError("Code invalide ou expiré. Demandez un nouveau code.", "invalid_reset_code");
     }
 
     const now = new Date();
-    await tx.orm.public.PasswordResetCode.where({ userId, usedAt: null }).update({ usedAt: now });
+    await tx.orm.public.PasswordResetCode.where({ userId, usedAt: null }).update({ usedAt: toTemporal(now) });
     await tx.orm.public.User.where({ id: userId }).update({
       passwordHash,
       lockedUntil: null,
       failedLoginAttempts: 0,
     });
-    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: now });
-    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: now });
+    await tx.orm.public.Session.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
+    await tx.orm.public.RefreshToken.where({ userId, revokedAt: null }).update({ revokedAt: toTemporal(now) });
   });
 }

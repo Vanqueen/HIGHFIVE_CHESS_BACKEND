@@ -31,6 +31,7 @@ export class AnonymousGameService {
       );
       return {
         game,
+        participant,
         // Anonymous creators cannot own InvitationLink rows, so the invitation is signed and stateless.
         inviteToken: signGuestGameToken(
           { kind: "guest-invite", gameId: game.id },
@@ -46,27 +47,31 @@ export class AnonymousGameService {
     }
   }
 
-  static async joinWithInvite(inviteToken: string) {
+  static async joinWithInvite(inviteToken: string, userId: number | null = null) {
     try {
       const token = verifyGuestGameToken(inviteToken, "guest-invite");
       if (!token || token.kind !== "guest-invite") {
         throw new HttpError("Lien de partie invalide ou expiré.", 410, false);
       }
-      const joined = await joinAnonymousGame(token.gameId);
+      const joined = await joinAnonymousGame(token.gameId, userId);
       if (!joined) {
-        throw new HttpError("La partie n'accepte plus de joueur invité.", 409, false);
+        throw new HttpError("La partie n'accepte plus de joueur.", 409, false);
       }
       return {
         game: joined.game,
         participant: joined.participant,
-        guestSessionToken: signGuestGameToken(
-          {
-            kind: "guest-session",
-            gameId: joined.game.id,
-            participantId: joined.participant.id,
-          },
-          SESSION_LIFETIME_SECONDS,
-        ),
+        ...(userId === null
+          ? {
+              guestSessionToken: signGuestGameToken(
+                {
+                  kind: "guest-session",
+                  gameId: joined.game.id,
+                  participantId: joined.participant.id,
+                },
+                SESSION_LIFETIME_SECONDS,
+              ),
+            }
+          : {}),
       };
     } catch (error) {
       rethrowServiceError(error, "Erreur lors de l'accès à la partie anonyme :");

@@ -13,6 +13,7 @@ import { findUser } from "../repository/user.repository";
 import { signGuestGameToken } from "../utils/guestGameToken";
 import { expireChallengeAndNotify } from "./challengeExpirationService";
 import { NotificationService } from "./notificationService";
+import { SocialService } from "./socialService";
 import { publishGameBroadcast } from "../events/game.broadcast";
 import { GAME_ACTIONS } from "../events/game.events";
 import HttpError, { rethrowServiceError } from "./errorService";
@@ -29,9 +30,8 @@ function withoutTokenHash<T extends { tokenHash: string }>(link: T) {
   return publicLink;
 }
 
-function epochMilliseconds(value: Date) {
-  const temporalValue = Reflect.get(value, "epochMilliseconds");
-  return typeof temporalValue === "number" ? temporalValue : value.getTime();
+function epochMilliseconds(value: Date | { epochMilliseconds: number }) {
+  return value instanceof Date ? value.getTime() : value.epochMilliseconds;
 }
 
 export class InvitationLinkService {
@@ -53,6 +53,9 @@ export class InvitationLinkService {
       if (challenge.creatorId !== creatorId) {
         throw new HttpError("Seul le créateur peut générer un lien.", 403, false);
       }
+      if (challenge.invitedUserId !== null) {
+        await SocialService.assertUsersCanInteract(creatorId, challenge.invitedUserId);
+      }
       if (challenge.status !== "PENDING") {
         throw new HttpError("Le défi n'est plus en attente.", 409, false);
       }
@@ -63,9 +66,10 @@ export class InvitationLinkService {
 
       const token = randomBytes(32).toString("base64url");
       const requestedExpiry = new Date(Date.now() + expiresInMinutes * 60_000);
-      const expiresAt = requestedExpiry.getTime() < epochMilliseconds(challenge.expiresAt)
-        ? requestedExpiry
-        : challenge.expiresAt;
+      const expiresAt = new Date(Math.min(
+        requestedExpiry.getTime(),
+        epochMilliseconds(challenge.expiresAt),
+      ));
       // The raw token is returned once; only its digest is persisted.
       const link = await createChallengeInvitationLink(
         creatorId,
@@ -172,6 +176,9 @@ export class InvitationLinkService {
       }
       if (userId !== null && (!user || user.accountStatus !== "ACTIVE" || user.deletedAt !== null)) {
         throw new HttpError("Votre compte ne peut pas accepter ce défi.", 403, false);
+      }
+      if (userId !== null) {
+        await SocialService.assertUsersCanInteract(challenge.creatorId, userId);
       }
 
       const accepted = await redeemChallengeInvitationLink(

@@ -48,6 +48,9 @@ export function getCorsOptions(env: NodeJS.ProcessEnv = process.env): CorsOption
       callback(null, isClientOriginAllowed(origin, allowedOrigins));
     },
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-CSRF-TOKEN"],
+    exposedHeaders: ["Authorization"],
+    credentials: true,
     maxAge: 600,
   };
 }

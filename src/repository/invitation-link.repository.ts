@@ -1,9 +1,10 @@
 import { db } from "../prisma/db.ts";
 import { createNotificationInTransaction } from "./notification.repository";
+import { toTemporal } from "../utils/temporalDate.ts";
+import { oppositeChessColor } from "../utils/chessColor.ts";
 
-function epochMilliseconds(value: Date) {
-  const temporalValue = Reflect.get(value, "epochMilliseconds");
-  return typeof temporalValue === "number" ? temporalValue : value.getTime();
+function epochMilliseconds(value: Date | { epochMilliseconds: number }) {
+  return value instanceof Date ? value.getTime() : value.epochMilliseconds;
 }
 
 type CreateInvitationLinkData = Parameters<typeof db.orm.public.InvitationLink.create>[0];
@@ -40,7 +41,12 @@ export async function createChallengeInvitationLink(
     const challenge = await tx.orm.public.Challenge
       .where({ id: challengeId, creatorId, status: "PENDING" })
       .first();
-    if (!challenge || challenge.expiresAt <= new Date() || expiresAt > challenge.expiresAt) {
+    const challengeExpiry = challenge ? epochMilliseconds(challenge.expiresAt) : 0;
+    if (
+      !challenge ||
+      challengeExpiry <= Date.now() ||
+      expiresAt.getTime() > challengeExpiry
+    ) {
       return null;
     }
     return tx.orm.public.InvitationLink.create({
@@ -51,7 +57,7 @@ export async function createChallengeInvitationLink(
       tournamentId: null,
       maxUses: 1,
       currentUses: 0,
-      expiresAt,
+      expiresAt: toTemporal(expiresAt),
       status: "ACTIVE",
     });
   });
@@ -89,6 +95,23 @@ export async function redeemChallengeInvitationLink(
       linkExpiresAt && epochMilliseconds(linkExpiresAt) <= now.getTime() ||
       epochMilliseconds(challengeExpiresAt) <= now.getTime()
     ) return null;
+    if (invitedUserId !== null) {
+      const [creatorBlockedInvitee, inviteeBlockedCreator] = await Promise.all([
+        tx.orm.public.BlockedUser.where({
+          blockerId: creatorId,
+          blockedUserId: invitedUserId,
+        }).first(),
+        tx.orm.public.BlockedUser.where({
+          blockerId: invitedUserId,
+          blockedUserId: creatorId,
+        }).first(),
+      ]);
+      if (creatorBlockedInvitee || inviteeBlockedCreator) {
+        throw Object.assign(new Error("Cette interaction n’est pas autorisée."), {
+          statusCode: 403,
+        });
+      }
+    }
 
     // The conditional update makes a challenge link single-use even under concurrent requests.
     const consumed = await tx.orm.public.InvitationLink
@@ -101,7 +124,7 @@ export async function redeemChallengeInvitationLink(
         status: "ACTIVE",
         maxUses: 1,
         currentUses: 0,
-        expiresAt: linkExpiresAt,
+        expiresAt: linkExpiresAt === null ? null : toTemporal(linkExpiresAt),
       })
       .update({ currentUses: 1, status: "EXHAUSTED" });
     if (!consumed) return null;
@@ -112,20 +135,26 @@ export async function redeemChallengeInvitationLink(
         creatorId,
         status: "PENDING",
         invitedUserId: challengeInviteeId,
-        expiresAt: challengeExpiresAt,
+        expiresAt: toTemporal(challengeExpiresAt),
       })
-      .update({ invitedUserId, status: "ACCEPTED", acceptedAt: now });
+      .update({ invitedUserId, status: "ACCEPTED", acceptedAt: toTemporal(now) });
     if (!accepted) {
       throw Object.assign(new Error("Le défi a déjà été traité."), { statusCode: 409 });
     }
 
     const game = await tx.orm.public.Game.where({ challengeId, status: "WAITING" }).first();
     if (!game) throw new Error(`Partie en attente absente pour le défi ${challengeId}.`);
+    const creatorParticipant = await tx.orm.public.GameParticipant
+      .where({ gameId: game.id, userId: creatorId, participantType: "USER" })
+      .first();
+    if (!creatorParticipant) {
+      throw new Error(`Participant créateur absent pour le défi ${challengeId}.`);
+    }
 
     const participant = await tx.orm.public.GameParticipant.create({
       gameId: game.id,
       participantType: invitedUserId === null ? "GUEST" : "USER",
-      color: "BLACK",
+      color: oppositeChessColor(creatorParticipant.color),
       userId: invitedUserId,
       tournamentParticipantId: null,
       displayName: null,

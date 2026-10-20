@@ -31,13 +31,14 @@ export const InvitationLinkController = {
   }) satisfies RequestHandler,
 
   joinAnonymousGame: (async (request, response) => {
+    const user = response.locals.user as AuthenticatedUser | undefined;
     const body = readBody(request);
     if (typeof body.token !== "string") {
       response.status(422).json({ success: false, message: "Jeton d'invitation requis." });
       return;
     }
     response.status(200).json(serializeBigInts(
-      await AnonymousGameService.joinWithInvite(body.token),
+      await AnonymousGameService.joinWithInvite(body.token, user?.id ?? null),
     ));
   }) satisfies RequestHandler,
 
