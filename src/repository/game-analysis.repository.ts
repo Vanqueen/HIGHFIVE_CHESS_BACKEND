@@ -10,7 +10,17 @@ export async function findGameAnalysis(id: number) {
 }
 
 export async function findGameAnalyses(limit = 100) {
-  return db.orm.public.GameAnalysis.limit(limit).all();
+  return db.orm.public.GameAnalysis
+    .orderBy((analysis) => analysis.analyzedAt.desc())
+    .limit(limit)
+    .all();
+}
+
+export async function findGameAnalysesByGameId(gameId: number) {
+  return db.orm.public.GameAnalysis
+    .where({ gameId })
+    .orderBy((analysis) => analysis.analyzedAt.desc())
+    .all();
 }
 
 export async function createGameAnalysis(data: CreateGameAnalysisData) {

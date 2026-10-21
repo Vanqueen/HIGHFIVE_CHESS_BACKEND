@@ -8,7 +8,26 @@ export async function findReport(id: number) {
 }
 
 export async function findReports(limit = 100) {
-  return db.orm.public.Report.limit(limit).all();
+  return db.orm.public.Report
+    .orderBy((report) => report.createdAt.desc())
+    .limit(limit)
+    .all();
+}
+
+export async function findReportsByStatus(status: "PENDING" | "UNDER_REVIEW" | "RESOLVED" | "REJECTED", limit = 50) {
+  return db.orm.public.Report
+    .where({ status })
+    .orderBy((report) => report.createdAt.asc())
+    .limit(limit)
+    .all();
+}
+
+export async function findReportsByReporter(reporterId: number, limit = 50) {
+  return db.orm.public.Report
+    .where({ reporterId })
+    .orderBy((report) => report.createdAt.desc())
+    .limit(limit)
+    .all();
 }
 
 export async function createReport(data: CreateReportData) {
@@ -17,6 +36,14 @@ export async function createReport(data: CreateReportData) {
 
 export async function updateReport(id: number, updates: UpdateReportData) {
   return db.orm.public.Report.where({ id }).update(updates);
+}
+
+export async function reviewReport(
+  id: number,
+  expectedStatus: "PENDING" | "UNDER_REVIEW",
+  updates: UpdateReportData,
+) {
+  return db.orm.public.Report.where({ id, status: expectedStatus }).update(updates);
 }
 
 export async function deleteReport(id: number) {

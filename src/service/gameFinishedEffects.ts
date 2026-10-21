@@ -2,6 +2,7 @@ import { db } from "../prisma/db.ts";
 import type { NotificationBroadcast } from "../events/notification.broadcast";
 import { NotificationService } from "./notificationService";
 import { calculateTournamentRatingChanges } from "./tournamentRating";
+import { updateUserAchievements } from "./achievementService";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -244,6 +245,7 @@ async function recordFinishedGameStatistics(
         "updatedAt" = NOW()
     `.affectedCount().build();
     await tx.execute(aggregateUpsert);
+    await updateUserAchievements(tx, participant.userId);
   }
 }
 

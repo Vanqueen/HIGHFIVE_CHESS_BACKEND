@@ -14,10 +14,12 @@ import tournamentsRouter from "./routes/tournaments";
 import usersRouter from "./routes/users";
 import socialRouter from "./routes/social";
 import conversationsRouter from "./routes/conversations";
+import reportsRouter from "./routes/reports";
 import { errorHandler } from "./middlewares/error.middleware";
 import { authApiRateLimit } from "./middlewares/auth-rate-limit.middleware";
 import { attachGameGateway } from "./websocket/game.gateway";
 import { startChallengeExpirationWorker } from "./service/challengeExpirationWorker";
+import { startStockfishAnalysisWorker } from "./service/stockfishAnalysisWorker";
 
 const port = Number(process.env.PORT ?? 3000);
 
@@ -44,6 +46,7 @@ async function startServer() {
   }
 
   startChallengeExpirationWorker();
+  startStockfishAnalysisWorker();
 
   const app = express();
   app.disable("x-powered-by");
@@ -71,6 +74,7 @@ async function startServer() {
   app.use("/api/users", usersRouter);
   app.use("/api", socialRouter);
   app.use("/api/conversations", conversationsRouter);
+  app.use("/api/reports", reportsRouter);
   app.use("/api/games", gameRouter);
   app.use("/api/challenges", challengesRouter);
   app.use("/api/invitation-links", invitationLinksRouter);

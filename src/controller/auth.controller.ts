@@ -5,10 +5,12 @@ import { requireAdmin, requireCurrentUser, readBody, readParamId, readString } f
 export const AuthController = {
   register: (async (request, response) => {
     const body = readBody(request);
+    const role = readString(body, "role");
     const result = await AuthService.register({
       username: readString(body, "username"),
       email: readString(body, "email"),
       password: readString(body, "password"),
+      role: role === "ORGANIZER" || role === "ADMIN" || role === "USER" ? role : "USER",
     });
     response.status(201).json(result);
   }) satisfies RequestHandler,

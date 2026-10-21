@@ -1,6 +1,7 @@
 import { db } from "../prisma/db.ts";
 import { createNotificationInTransaction } from "./notification.repository";
 import { epochMilliseconds, toTemporal } from "../utils/temporalDate.ts";
+import { updateUserAchievements } from "../service/achievementService";
 
 type CreateFriendshipData = Parameters<typeof db.orm.public.Friendship.create>[0];
 type UpdateFriendshipData = Parameters<
@@ -77,6 +78,10 @@ export async function createOrUpdateFriendshipRequest(
         .where({ id: reverse.id, status: "PENDING" })
         .update({ status: "ACCEPTED", respondedAt: toTemporal(new Date()) });
       if (!friendship) return { friendship: null, notifications: [], kind: "raced" as const };
+      await Promise.all([
+        updateUserAchievements(tx, requesterId),
+        updateUserAchievements(tx, addresseeId),
+      ]);
       const notification = await createNotificationInTransaction(
         tx,
         { userId: reverse.requesterId },
@@ -131,6 +136,10 @@ export async function acceptFriendshipRequest(friendshipId: number, addresseeId:
       .where({ id: friendshipId, addresseeId, status: "PENDING" })
       .update({ status: "ACCEPTED", respondedAt: toTemporal(new Date()) });
     if (!friendship) return null;
+    await Promise.all([
+      updateUserAchievements(tx, pending.requesterId),
+      updateUserAchievements(tx, pending.addresseeId),
+    ]);
 
     const notification = await createNotificationInTransaction(
       tx,

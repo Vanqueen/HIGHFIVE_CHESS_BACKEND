@@ -1,0 +1,683 @@
+[
+  {
+    "id": "table.GamePlayerStatistic",
+    "label": "Create table \"GamePlayerStatistic\"",
+    "summary": "Creates table \"GamePlayerStatistic\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "GamePlayerStatistic"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"GamePlayerStatistic\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GamePlayerStatistic\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"GamePlayerStatistic\"",
+        "sql": "CREATE TABLE \"public\".\"GamePlayerStatistic\" (\n  \"color\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"gameId\" int4 NOT NULL,\n  \"gameType\" text NOT NULL,\n  \"id\" SERIAL NOT NULL,\n  \"outcome\" text NOT NULL,\n  \"userId\" int4 NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"GamePlayerStatistic_color_check_1b276a2b\" CHECK (\"color\" IN ('WHITE', 'BLACK')),\n  CONSTRAINT \"GamePlayerStatistic_gameType_check_603adf18\" CHECK (\"gameType\" IN ('LOCAL', 'ONLINE', 'AI', 'CHALLENGE', 'TOURNAMENT')),\n  CONSTRAINT \"GamePlayerStatistic_outcome_check_badde9c1\" CHECK (\"outcome\" IN ('WIN', 'LOSS', 'DRAW'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"GamePlayerStatistic\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GamePlayerStatistic\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.GuestNotification",
+    "label": "Create table \"GuestNotification\"",
+    "summary": "Creates table \"GuestNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "GuestNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"GuestNotification\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"GuestNotification\"",
+        "sql": "CREATE TABLE \"public\".\"GuestNotification\" (\n  \"content\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"data\" json,\n  \"expiresAt\" timestamptz,\n  \"guestParticipantId\" int4 NOT NULL,\n  \"id\" SERIAL NOT NULL,\n  \"readAt\" timestamptz,\n  \"title\" text NOT NULL,\n  \"type\" text NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"GuestNotification_type_check_dbad3a07\" CHECK (\"type\" IN ('FRIEND_REQUEST', 'FRIEND_REQUEST_ACCEPTED', 'CHALLENGE_RECEIVED', 'CHALLENGE_ACCEPTED', 'GAME_STARTED', 'GAME_FINISHED', 'GAME_YOUR_TURN', 'TOURNAMENT_INVITATION', 'TOURNAMENT_STARTED', 'TOURNAMENT_ROUND_STARTED', 'TOURNAMENT_ROUND_FINISHED', 'SYSTEM'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"GuestNotification\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.UserStatistics",
+    "label": "Create table \"UserStatistics\"",
+    "summary": "Creates table \"UserStatistics\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "UserStatistics"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"UserStatistics\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"UserStatistics\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"UserStatistics\"",
+        "sql": "CREATE TABLE \"public\".\"UserStatistics\" (\n  \"draws\" int4 DEFAULT 0 NOT NULL,\n  \"gamesPlayed\" int4 DEFAULT 0 NOT NULL,\n  \"losses\" int4 DEFAULT 0 NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" int4 NOT NULL,\n  \"wins\" int4 DEFAULT 0 NOT NULL,\n  PRIMARY KEY (\"userId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"UserStatistics\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"UserStatistics\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.GameAnalysis.GameAnalysis_gameId_engine_key",
+    "label": "Add unique constraint on \"GameAnalysis\" (gameId, engine)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "GameAnalysis_gameId_engine_key",
+        "table": "GameAnalysis"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"GameAnalysis_gameId_engine_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GameAnalysis_gameId_engine_key",
+          "public",
+          "\"public\".\"GameAnalysis\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"GameAnalysis_gameId_engine_key\"",
+        "sql": "ALTER TABLE \"public\".\"GameAnalysis\" ADD CONSTRAINT \"GameAnalysis_gameId_engine_key\" UNIQUE (\"gameId\", \"engine\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"GameAnalysis_gameId_engine_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GameAnalysis_gameId_engine_key",
+          "public",
+          "\"public\".\"GameAnalysis\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.GamePlayerStatistic.GamePlayerStatistic_gameId_userId_key",
+    "label": "Add unique constraint on \"GamePlayerStatistic\" (gameId, userId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "GamePlayerStatistic_gameId_userId_key",
+        "table": "GamePlayerStatistic"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"GamePlayerStatistic_gameId_userId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GamePlayerStatistic_gameId_userId_key",
+          "public",
+          "\"public\".\"GamePlayerStatistic\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"GamePlayerStatistic_gameId_userId_key\"",
+        "sql": "ALTER TABLE \"public\".\"GamePlayerStatistic\" ADD CONSTRAINT \"GamePlayerStatistic_gameId_userId_key\" UNIQUE (\"gameId\", \"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"GamePlayerStatistic_gameId_userId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GamePlayerStatistic_gameId_userId_key",
+          "public",
+          "\"public\".\"GamePlayerStatistic\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.GamePlayerStatistic.GamePlayerStatistic_gameId_idx_6cdb47f8",
+    "label": "Create index \"GamePlayerStatistic_gameId_idx_6cdb47f8\" on \"GamePlayerStatistic\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "GamePlayerStatistic_gameId_idx_6cdb47f8",
+        "table": "GamePlayerStatistic"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"GamePlayerStatistic_gameId_idx_6cdb47f8\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GamePlayerStatistic_gameId_idx_6cdb47f8\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"GamePlayerStatistic_gameId_idx_6cdb47f8\"",
+        "sql": "CREATE INDEX \"GamePlayerStatistic_gameId_idx_6cdb47f8\" ON \"public\".\"GamePlayerStatistic\" (\"gameId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"GamePlayerStatistic_gameId_idx_6cdb47f8\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GamePlayerStatistic_gameId_idx_6cdb47f8\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.GamePlayerStatistic.GamePlayerStatistic_userId_createdAt_idx_f726f04a",
+    "label": "Create index \"GamePlayerStatistic_userId_createdAt_idx_f726f04a\" on \"GamePlayerStatistic\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "GamePlayerStatistic_userId_createdAt_idx_f726f04a",
+        "table": "GamePlayerStatistic"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"GamePlayerStatistic_userId_createdAt_idx_f726f04a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GamePlayerStatistic_userId_createdAt_idx_f726f04a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"GamePlayerStatistic_userId_createdAt_idx_f726f04a\"",
+        "sql": "CREATE INDEX \"GamePlayerStatistic_userId_createdAt_idx_f726f04a\" ON \"public\".\"GamePlayerStatistic\" (\"userId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"GamePlayerStatistic_userId_createdAt_idx_f726f04a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GamePlayerStatistic_userId_createdAt_idx_f726f04a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.GamePlayerStatistic.GamePlayerStatistic_userId_idx_a489d58a",
+    "label": "Create index \"GamePlayerStatistic_userId_idx_a489d58a\" on \"GamePlayerStatistic\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "GamePlayerStatistic_userId_idx_a489d58a",
+        "table": "GamePlayerStatistic"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"GamePlayerStatistic_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GamePlayerStatistic_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"GamePlayerStatistic_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"GamePlayerStatistic_userId_idx_a489d58a\" ON \"public\".\"GamePlayerStatistic\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"GamePlayerStatistic_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GamePlayerStatistic_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.GuestNotification.GuestNotification_createdAt_idx_9575dbd7",
+    "label": "Create index \"GuestNotification_createdAt_idx_9575dbd7\" on \"GuestNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "GuestNotification_createdAt_idx_9575dbd7",
+        "table": "GuestNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"GuestNotification_createdAt_idx_9575dbd7\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification_createdAt_idx_9575dbd7\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"GuestNotification_createdAt_idx_9575dbd7\"",
+        "sql": "CREATE INDEX \"GuestNotification_createdAt_idx_9575dbd7\" ON \"public\".\"GuestNotification\" (\"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"GuestNotification_createdAt_idx_9575dbd7\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification_createdAt_idx_9575dbd7\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.GuestNotification.GuestNotification_expiresAt_idx_6b6b8c10",
+    "label": "Create index \"GuestNotification_expiresAt_idx_6b6b8c10\" on \"GuestNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "GuestNotification_expiresAt_idx_6b6b8c10",
+        "table": "GuestNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"GuestNotification_expiresAt_idx_6b6b8c10\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification_expiresAt_idx_6b6b8c10\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"GuestNotification_expiresAt_idx_6b6b8c10\"",
+        "sql": "CREATE INDEX \"GuestNotification_expiresAt_idx_6b6b8c10\" ON \"public\".\"GuestNotification\" (\"expiresAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"GuestNotification_expiresAt_idx_6b6b8c10\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification_expiresAt_idx_6b6b8c10\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.GuestNotification.GuestNotification_guestParticipantId_idx_9a282615",
+    "label": "Create index \"GuestNotification_guestParticipantId_idx_9a282615\" on \"GuestNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "GuestNotification_guestParticipantId_idx_9a282615",
+        "table": "GuestNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"GuestNotification_guestParticipantId_idx_9a282615\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification_guestParticipantId_idx_9a282615\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"GuestNotification_guestParticipantId_idx_9a282615\"",
+        "sql": "CREATE INDEX \"GuestNotification_guestParticipantId_idx_9a282615\" ON \"public\".\"GuestNotification\" (\"guestParticipantId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"GuestNotification_guestParticipantId_idx_9a282615\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification_guestParticipantId_idx_9a282615\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.GuestNotification.GuestNotification_readAt_idx_1b4c936e",
+    "label": "Create index \"GuestNotification_readAt_idx_1b4c936e\" on \"GuestNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "GuestNotification_readAt_idx_1b4c936e",
+        "table": "GuestNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"GuestNotification_readAt_idx_1b4c936e\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification_readAt_idx_1b4c936e\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"GuestNotification_readAt_idx_1b4c936e\"",
+        "sql": "CREATE INDEX \"GuestNotification_readAt_idx_1b4c936e\" ON \"public\".\"GuestNotification\" (\"readAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"GuestNotification_readAt_idx_1b4c936e\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification_readAt_idx_1b4c936e\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.GuestNotification.GuestNotification_type_idx_b6b604ea",
+    "label": "Create index \"GuestNotification_type_idx_b6b604ea\" on \"GuestNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "GuestNotification_type_idx_b6b604ea",
+        "table": "GuestNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"GuestNotification_type_idx_b6b604ea\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification_type_idx_b6b604ea\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"GuestNotification_type_idx_b6b604ea\"",
+        "sql": "CREATE INDEX \"GuestNotification_type_idx_b6b604ea\" ON \"public\".\"GuestNotification\" (\"type\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"GuestNotification_type_idx_b6b604ea\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GuestNotification_type_idx_b6b604ea\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.GamePlayerStatistic.GamePlayerStatistic_gameId_fkey",
+    "label": "Add foreign key \"GamePlayerStatistic_gameId_fkey\" on \"GamePlayerStatistic\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "GamePlayerStatistic_gameId_fkey",
+        "table": "GamePlayerStatistic"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"GamePlayerStatistic_gameId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GamePlayerStatistic_gameId_fkey",
+          "public",
+          "\"public\".\"GamePlayerStatistic\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"GamePlayerStatistic_gameId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"GamePlayerStatistic\"\nADD CONSTRAINT \"GamePlayerStatistic_gameId_fkey\"\nFOREIGN KEY (\"gameId\")\nREFERENCES \"public\".\"Game\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"GamePlayerStatistic_gameId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GamePlayerStatistic_gameId_fkey",
+          "public",
+          "\"public\".\"GamePlayerStatistic\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.GamePlayerStatistic.GamePlayerStatistic_userId_fkey",
+    "label": "Add foreign key \"GamePlayerStatistic_userId_fkey\" on \"GamePlayerStatistic\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "GamePlayerStatistic_userId_fkey",
+        "table": "GamePlayerStatistic"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"GamePlayerStatistic_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GamePlayerStatistic_userId_fkey",
+          "public",
+          "\"public\".\"GamePlayerStatistic\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"GamePlayerStatistic_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"GamePlayerStatistic\"\nADD CONSTRAINT \"GamePlayerStatistic_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"User\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"GamePlayerStatistic_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GamePlayerStatistic_userId_fkey",
+          "public",
+          "\"public\".\"GamePlayerStatistic\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.GuestNotification.GuestNotification_guestParticipantId_fkey",
+    "label": "Add foreign key \"GuestNotification_guestParticipantId_fkey\" on \"GuestNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "GuestNotification_guestParticipantId_fkey",
+        "table": "GuestNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"GuestNotification_guestParticipantId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GuestNotification_guestParticipantId_fkey",
+          "public",
+          "\"public\".\"GuestNotification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"GuestNotification_guestParticipantId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"GuestNotification\"\nADD CONSTRAINT \"GuestNotification_guestParticipantId_fkey\"\nFOREIGN KEY (\"guestParticipantId\")\nREFERENCES \"public\".\"GameParticipant\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"GuestNotification_guestParticipantId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GuestNotification_guestParticipantId_fkey",
+          "public",
+          "\"public\".\"GuestNotification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.UserStatistics.UserStatistics_userId_fkey",
+    "label": "Add foreign key \"UserStatistics_userId_fkey\" on \"UserStatistics\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "UserStatistics_userId_fkey",
+        "table": "UserStatistics"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"UserStatistics_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "UserStatistics_userId_fkey",
+          "public",
+          "\"public\".\"UserStatistics\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"UserStatistics_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"UserStatistics\"\nADD CONSTRAINT \"UserStatistics_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"User\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"UserStatistics_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "UserStatistics_userId_fkey",
+          "public",
+          "\"public\".\"UserStatistics\""
+        ]
+      }
+    ]
+  }
+]

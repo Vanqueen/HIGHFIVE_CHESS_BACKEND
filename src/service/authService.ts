@@ -58,9 +58,14 @@ export class AuthService {
     };
   }
 
-  static async register(userData: { username: string; email: string; password: string }) {
+  static async register(userData: {
+    username: string;
+    email: string;
+    password: string;
+    role?: "USER" | "ORGANIZER" | "ADMIN";
+  }) {
     try {
-      const { username, email, password } = userData;
+      const { username, email, password, role = "USER" } = userData;
       if (!username || !email || !password) {
         throw new HttpError("Tous les champs sont requis.", 422, false);
       }
@@ -100,6 +105,7 @@ export class AuthService {
         normalizedEmail,
         normalizedUsername,
         await hashPassword(password),
+        role,
       );
       return {
         success: true,

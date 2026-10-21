@@ -2,6 +2,7 @@ import { db } from "../prisma/db.ts";
 import { calculateTournamentRatingChanges } from "../service/tournamentRating";
 import { Temporal } from "temporal-polyfill";
 import { toTemporal } from "../utils/temporalDate.ts";
+import { updateUserAchievements } from "../service/achievementService";
 
 const STANDARD_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -607,6 +608,14 @@ export async function advanceTournamentRound(
       await tx.orm.public.TournamentParticipant
         .where({ tournamentId, status: "ACTIVE" })
         .update({ status: "FINISHED" });
+      const participants = await tx.orm.public.TournamentParticipant
+        .where({ tournamentId, status: "FINISHED" })
+        .all();
+      for (const userId of new Set(participants.flatMap((participant) =>
+        participant.userId === null ? [] : [participant.userId]
+      ))) {
+        await updateUserAchievements(tx, userId);
+      }
       return { finished: true as const, round };
     }
 

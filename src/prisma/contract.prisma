@@ -801,4 +801,5 @@ model GameAnalysis {
   @@index([gameId])
   @@index([engine])
   @@index([analyzedAt])
+  @@unique([gameId, engine])
 }
