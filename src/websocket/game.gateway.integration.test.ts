@@ -173,6 +173,24 @@ describe("game gateway integration", () => {
       action: GAME_ACTIONS.DRAW_OFFERED,
       result: { game: { id: 41, blackTimeRemainingMs: "60000" } },
     });
+    const notification = new Promise<unknown>((resolve) =>
+      client?.once(CONNECTION_EVENTS.NOTIFICATION, resolve)
+    );
+    publishNotification({
+      id: 92,
+      userId: 7,
+      guestParticipantId: null,
+      type: "GAME_FINISHED",
+      title: "Partie terminée",
+      content: "La partie est terminée.",
+      data: { gameId: 41 },
+      createdAt: Temporal.Instant.fromEpochMilliseconds(Date.now()),
+    });
+    await expect(notification).resolves.toMatchObject({
+      id: 92,
+      userId: 7,
+      type: "GAME_FINISHED",
+    });
     expect(mocks.authenticateAccessToken).toHaveBeenCalledWith("test-access-token");
     expect(mocks.setOnline).toHaveBeenCalledWith(7);
     expect(mocks.getGameForUser).toHaveBeenCalledWith(41, 7);

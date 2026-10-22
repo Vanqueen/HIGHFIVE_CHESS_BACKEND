@@ -3,6 +3,7 @@ import { createInterface } from "node:readline";
 import { db } from "../prisma/db.ts";
 import { findGameAnalysesByGameId, createGameAnalysis } from "../repository/game-analysis.repository";
 import { findMovesByGameId } from "../repository/move.repository";
+import { toTemporal } from "../utils/temporalDate.ts";
 
 const POLL_INTERVAL_MS = 30_000;
 const ANALYSIS_TIMEOUT_MS = 20_000;
@@ -154,16 +155,46 @@ function configuredDepth() {
   return depth;
 }
 
+export async function verifyStockfishConfiguration() {
+  const enginePath = process.env.STOCKFISH_PATH?.trim();
+  if (!enginePath) {
+    throw new Error("STOCKFISH_PATH is not configured.");
+  }
+  const depth = configuredDepth();
+  const engine = new UciSession(enginePath);
+  try {
+    await engine.initialize();
+    const result = await engine.analyze(START_FEN, depth);
+    if (!result.bestMove) {
+      throw new Error("Stockfish responded to UCI but returned no legal move.");
+    }
+    return {
+      engineVersion: engine.engineVersion,
+      depth: result.depth,
+      bestMove: result.bestMove,
+    };
+  } finally {
+    await engine.close();
+  }
+}
+
 function whitePerspectiveEvaluation(fen: string, score: number | null) {
   if (score === null) return null;
   return fen.split(" ")[1] === "b" ? -score : score;
 }
 
+export type GameAnalysisOutcome =
+  | "ANALYZED"
+  | "ALREADY_ANALYZED"
+  | "GAME_NOT_FOUND"
+  | "GAME_NOT_FINISHED";
+
 async function analyzeFinishedGame(gameId: number, enginePath: string, depth: number) {
-  const game = await db.orm.public.Game.where({ id: gameId, status: "FINISHED" }).first();
-  if (!game) return false;
+  const game = await db.orm.public.Game.where({ id: gameId }).first();
+  if (!game) return "GAME_NOT_FOUND" as const;
+  if (game.status !== "FINISHED") return "GAME_NOT_FINISHED" as const;
   const existing = await findGameAnalysesByGameId(gameId);
-  if (existing.length > 0) return false;
+  if (existing.length > 0) return "ALREADY_ANALYZED" as const;
 
   const moves = await findMovesByGameId(gameId);
   const firstAnalyzedMoveIndex = Math.max(0, moves.length - MAX_ANALYZED_PLIES);
@@ -199,7 +230,7 @@ async function analyzeFinishedGame(gameId: number, enginePath: string, depth: nu
         engine: "Stockfish",
         engineVersion: engine.engineVersion,
         depth: finalPosition.depth || depth,
-        analyzedAt: new Date(),
+        analyzedAt: toTemporal(new Date()),
         accuracyWhite: null,
         accuracyBlack: null,
         evaluation: finalEvaluation === null ? null : finalEvaluation / 100,
@@ -222,12 +253,21 @@ async function analyzeFinishedGame(gameId: number, enginePath: string, depth: nu
         : undefined;
       if (databaseCode !== "23505" && databaseCode !== "P2002") throw error;
       if ((await findGameAnalysesByGameId(gameId)).length === 0) throw error;
-      return false;
+      return "ALREADY_ANALYZED" as const;
     }
-    return true;
+    return "ANALYZED" as const;
   } finally {
     await engine.close();
   }
+}
+
+export async function analyzeGameById(gameId: number): Promise<GameAnalysisOutcome> {
+  if (!Number.isSafeInteger(gameId) || gameId <= 0) {
+    throw new Error("The game ID must be a positive safe integer.");
+  }
+  const enginePath = process.env.STOCKFISH_PATH?.trim();
+  if (!enginePath) throw new Error("STOCKFISH_PATH is not configured.");
+  return analyzeFinishedGame(gameId, enginePath, configuredDepth());
 }
 
 const queuedGameIds = new Set<number>();
@@ -275,7 +315,8 @@ async function runAnalysisBatch() {
       queuedGameIds.delete(gameId);
       processingGameIds.add(gameId);
       try {
-        if (await analyzeFinishedGame(gameId, enginePath, depth)) {
+        const outcome = await analyzeFinishedGame(gameId, enginePath, depth);
+        if (outcome === "ANALYZED") {
           retryAfter.delete(gameId);
           console.info(`[stockfish] Analysis saved for game ${gameId}.`);
         }

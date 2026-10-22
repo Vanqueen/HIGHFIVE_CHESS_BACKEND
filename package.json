@@ -11,6 +11,8 @@
   "scripts": {
     "test": "vitest run",
     "build": "tsdown",
+    "stockfish:check": "npx tsx --trace-warnings src/service/checkStockfish.ts",
+    "stockfish:analyze": "npx tsx --trace-warnings src/service/analyze-game.ts",
     "composer:deploy": "prisma deploy module.ts",
     "composer:dev": "prisma dev module.ts",
     "contract:emit": "prisma contract emit",
@@ -19,6 +21,7 @@
     "db:verify": "prisma db verify",
     "db:push": "prisma db push",
     "db:seed": "npx tsx --trace-warnings src/prisma/run-seed.ts",
+    "admin:bootstrap": "npx tsx --trace-warnings src/prisma/bootstrap-admin.ts",
     "db:backfill-move-fen": "npx tsx --trace-warnings src/prisma/backfill-move-fen.ts",
     "deploy": "npm run build && npm run composer:deploy",
     "dev": "tsx watch --trace-warnings src/index.ts",

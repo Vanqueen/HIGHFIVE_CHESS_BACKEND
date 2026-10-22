@@ -14,6 +14,12 @@ import {
 const authRouter = Router();
 
 authRouter.post("/register", registrationRateLimit, AuthController.register);
+authRouter.post(
+  "/admin/users",
+  authenticate,
+  requireRole("ADMIN"),
+  AuthController.createPrivilegedUser,
+);
 authRouter.post("/login", loginRateLimit, AuthController.login);
 authRouter.post("/refresh", refreshRateLimit, AuthController.refresh);
 authRouter.post("/logout", authenticate, AuthController.logout);

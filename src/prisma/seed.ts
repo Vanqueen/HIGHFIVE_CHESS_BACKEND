@@ -1,11 +1,5 @@
 import { connectDatabase, db } from "./db.ts";
 
-const users = [
-  { email: "alice@prisma.io", username: "alice", passwordHash: "alice123" },
-  { email: "bob@prisma.io", username: "bob", passwordHash: "bob123" },
-  { email: "carol@prisma.io", username: "carol", passwordHash: "carol123" },
-];
-
 const achievements = [
   { code: "FIRST_GAME", name: "Première partie", description: "Terminer une partie.", category: "GAMES", requirementType: "GAMES_PLAYED", requirementValue: 1 },
   { code: "TEN_GAMES", name: "Habitué", description: "Terminer 10 parties.", category: "GAMES", requirementType: "GAMES_PLAYED", requirementValue: 10 },
@@ -23,14 +17,6 @@ let pendingSeed: Promise<void> | undefined;
 
 async function runSeed(): Promise<void> {
   await connectDatabase();
-
-  for (const user of users) {
-    await db.orm.public.User.upsert({
-      create: user,
-      update: {},
-      conflictOn: { email: user.email },
-    });
-  }
 
   for (const achievement of achievements) {
     await db.orm.public.Achievement.upsert({

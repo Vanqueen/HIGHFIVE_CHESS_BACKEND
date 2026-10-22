@@ -15,28 +15,12 @@ import { MOVE_EVENTS } from "../events/move.events";
 import { subscribeToNotifications } from "../events/notification.broadcast";
 
 const inheritedEnvironment = { ...process.env };
-const baseEnvPath = resolve(process.cwd(), ".env");
-const baseEnvironment = existsSync(baseEnvPath)
-  ? dotenv.parse(readFileSync(baseEnvPath))
-  : {};
-const requestedNodeEnv = inheritedEnvironment.NODE_ENV?.trim();
-const hasTestEnvironmentFile = existsSync(resolve(process.cwd(), ".env.test"));
-const integrationNodeEnv = requestedNodeEnv && requestedNodeEnv !== "test"
-  ? requestedNodeEnv
-  : hasTestEnvironmentFile
-  ? "test"
-  : baseEnvironment.NODE_ENV?.trim() || requestedNodeEnv || "development";
-const selectedEnvPath = resolve(process.cwd(), `.env.${integrationNodeEnv}`);
-const selectedEnvironment = existsSync(selectedEnvPath)
-  ? dotenv.parse(readFileSync(selectedEnvPath))
+const testEnvPath = resolve(process.cwd(), ".env.test");
+const testEnvironment = existsSync(testEnvPath)
+  ? dotenv.parse(readFileSync(testEnvPath))
   : {};
 const testDatabaseUrl = inheritedEnvironment.TEST_DATABASE_URL?.trim() ||
-  selectedEnvironment.TEST_DATABASE_URL?.trim() ||
-  (integrationNodeEnv === "production"
-    ? undefined
-    : inheritedEnvironment.DATABASE_URL?.trim() ||
-      selectedEnvironment.DATABASE_URL?.trim() ||
-      baseEnvironment.DATABASE_URL?.trim());
+  testEnvironment.TEST_DATABASE_URL?.trim();
 const originalDatabaseUrl = process.env.DATABASE_URL;
 const originalAccessSecret = process.env.JWT_ACCESS_SECRET;
 let database: typeof import("./db.ts")["db"] | undefined;
@@ -53,12 +37,66 @@ let advanceTournamentRound: typeof import("../repository/tournament.repository")
 const createdGameIds: number[] = [];
 const createdTournamentIds: number[] = [];
 const createdUserIds: number[] = [];
+const createdReportIds: number[] = [];
+const createdAchievementIds: number[] = [];
+const createdSessionIds: number[] = [];
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 function requireDatabase() {
   if (!database) throw new Error("PostgreSQL integration database is not connected.");
   return database;
+}
+
+async function createIntegrationToken(user: {
+  id: number;
+  email: string;
+  role: "USER" | "ORGANIZER" | "ADMIN";
+}) {
+  const db = requireDatabase();
+  const secret = process.env.JWT_ACCESS_SECRET;
+  if (!secret) throw new Error("JWT_ACCESS_SECRET is not configured for integration tests.");
+  const expiresAt = Temporal.Instant.fromEpochMilliseconds(Date.now() + 3_600_000);
+  const session = await db.orm.public.Session.create({ userId: user.id, expiresAt });
+  createdSessionIds.push(session.id);
+  return jwt.sign({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    type: "access",
+    sessionId: session.id,
+  }, secret, { expiresIn: "1h" });
+}
+
+async function startIntegrationApi() {
+  const app = express();
+  app.use(express.json());
+  const [{ default: reportsRouter }, { default: usersRouter }, { errorHandler }] =
+    await Promise.all([
+      import("../routes/reports"),
+      import("../routes/users"),
+      import("../middlewares/error.middleware"),
+    ]);
+  app.use("/api/reports", reportsRouter);
+  app.use("/api/users", usersRouter);
+  app.use(errorHandler);
+
+  const server = createServer(app);
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    throw new Error("Impossible de démarrer le serveur HTTP d'intégration.");
+  }
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    }),
+  };
 }
 
 async function createRatedGameFixture() {
@@ -171,6 +209,19 @@ async function createTournamentFixture(
 
 async function cleanupFixtures() {
   const db = requireDatabase();
+  for (const sessionId of createdSessionIds) {
+    await db.orm.public.Session.where({ id: sessionId }).delete();
+  }
+  createdSessionIds.length = 0;
+  for (const reportId of createdReportIds) {
+    await db.orm.public.Report.where({ id: reportId }).delete();
+  }
+  createdReportIds.length = 0;
+  for (const achievementId of createdAchievementIds) {
+    await db.orm.public.UserAchievement.where({ achievementId }).delete();
+    await db.orm.public.Achievement.where({ id: achievementId }).delete();
+  }
+  createdAchievementIds.length = 0;
   for (const gameId of createdGameIds) {
     const histories = await db.orm.public.RatingHistory.where({ gameId }).all();
     for (const history of histories) {
@@ -238,9 +289,255 @@ describe.skipIf(!testDatabaseUrl)("PostgreSQL game-finished integration", () => 
     expect(moves).toBeInstanceOf(Array);
   }, 30_000);
 
+  it("persists, lists and reviews reports against PostgreSQL", async () => {
+    const db = requireDatabase();
+    const suffix = randomUUID();
+    const reporter = await db.orm.public.User.create({
+      username: `it-reporter-${suffix}`,
+      email: `it-reporter-${suffix}@example.test`,
+      passwordHash: "integration-test-only",
+    });
+    createdUserIds.push(reporter.id);
+    const reportedUser = await db.orm.public.User.create({
+      username: `it-reported-${suffix}`,
+      email: `it-reported-${suffix}@example.test`,
+      passwordHash: "integration-test-only",
+    });
+    createdUserIds.push(reportedUser.id);
+    const admin = await db.orm.public.User.create({
+      username: `it-reviewer-${suffix}`,
+      email: `it-reviewer-${suffix}@example.test`,
+      passwordHash: "integration-test-only",
+      role: "ADMIN",
+    });
+    createdUserIds.push(admin.id);
+
+    process.env.JWT_ACCESS_SECRET = `integration-${randomUUID()}`;
+    const [reporterToken, adminToken] = await Promise.all([
+      createIntegrationToken(reporter),
+      createIntegrationToken(admin),
+    ]);
+    const api = await startIntegrationApi();
+    try {
+      const createResponse = await fetch(`${api.baseUrl}/api/reports`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${reporterToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          reportedUserId: reportedUser.id,
+          reason: "OTHER",
+          description: "PostgreSQL route integration test",
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const report = await createResponse.json() as { id: number };
+      createdReportIds.push(report.id);
+
+      const mineResponse = await fetch(`${api.baseUrl}/api/reports/me`, {
+        headers: { authorization: `Bearer ${reporterToken}` },
+      });
+      expect(mineResponse.status).toBe(200);
+      expect(await mineResponse.json()).toContainEqual(
+        expect.objectContaining({ id: report.id, status: "PENDING" }),
+      );
+
+      const deniedQueueResponse = await fetch(`${api.baseUrl}/api/reports/`);
+      expect(deniedQueueResponse.status).toBe(401);
+      const forbiddenQueueResponse = await fetch(`${api.baseUrl}/api/reports/`, {
+        headers: { authorization: `Bearer ${reporterToken}` },
+      });
+      expect(forbiddenQueueResponse.status).toBe(403);
+      const queueResponse = await fetch(`${api.baseUrl}/api/reports/?status=PENDING`, {
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(queueResponse.status).toBe(200);
+      expect(await queueResponse.json()).toContainEqual(
+        expect.objectContaining({ id: report.id, reporterId: reporter.id }),
+      );
+
+      const reviewResponse = await fetch(`${api.baseUrl}/api/reports/${report.id}`, {
+        method: "PATCH",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "RESOLVED",
+          resolutionNote: "Reviewed in route integration test",
+        }),
+      });
+      expect(reviewResponse.status).toBe(200);
+      await expect(db.orm.public.Report.where({ id: report.id }).first()).resolves.toMatchObject({
+        status: "RESOLVED",
+        reviewedById: admin.id,
+        resolutionNote: "Reviewed in route integration test",
+      });
+    } finally {
+      await api.close();
+    }
+  }, 30_000);
+
+  it("serves persisted achievements through the authenticated user route", async () => {
+    const db = requireDatabase();
+    const suffix = randomUUID();
+    const user = await db.orm.public.User.create({
+      username: `it-achievement-api-${suffix}`,
+      email: `it-achievement-api-${suffix}@example.test`,
+      passwordHash: "integration-test-only",
+    });
+    createdUserIds.push(user.id);
+    const achievement = await db.orm.public.Achievement.create({
+      code: `IT_API_ACHIEVEMENT_${suffix}`,
+      name: "API integration",
+      description: "Achievement returned by the authenticated HTTP endpoint.",
+      category: "GAMES",
+      requirementType: "GAMES_PLAYED",
+      requirementValue: 1,
+      isActive: true,
+    });
+    createdAchievementIds.push(achievement.id);
+    await db.orm.public.UserAchievement.create({
+      userId: user.id,
+      achievementId: achievement.id,
+      progress: 1,
+      unlockedAt: Temporal.Now.instant(),
+    });
+    process.env.JWT_ACCESS_SECRET = `integration-${randomUUID()}`;
+    const token = await createIntegrationToken(user);
+    const api = await startIntegrationApi();
+    try {
+      const response = await fetch(`${api.baseUrl}/api/users/me/achievements`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toContainEqual(
+        expect.objectContaining({
+          userId: user.id,
+          achievementId: achievement.id,
+          progress: 1,
+          achievement: expect.objectContaining({ code: achievement.code }),
+        }),
+      );
+    } finally {
+      await api.close();
+    }
+  }, 30_000);
+
+  it("updates achievements transactionally and idempotently in PostgreSQL", async () => {
+    const db = requireDatabase();
+    const { updateUserAchievements } = await import("../service/achievementService");
+    const suffix = randomUUID();
+    const user = await db.orm.public.User.create({
+      username: `it-achievement-${suffix}`,
+      email: `it-achievement-${suffix}@example.test`,
+      passwordHash: "integration-test-only",
+    });
+    createdUserIds.push(user.id);
+    const achievement = await db.orm.public.Achievement.create({
+      code: `IT_WINS_${suffix}`,
+      name: "Integration win",
+      description: "Achievement used by the PostgreSQL integration test.",
+      category: "WINS",
+      requirementType: "WINS",
+      requirementValue: 1,
+      isActive: true,
+    });
+    createdAchievementIds.push(achievement.id);
+    await db.orm.public.UserStatistics.create({
+      userId: user.id,
+      gamesPlayed: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+    });
+
+    await db.transaction((tx) => updateUserAchievements(tx, user.id));
+    const lockedProgress = await db.orm.public.UserAchievement
+      .where({ userId: user.id, achievementId: achievement.id })
+      .first();
+    expect(lockedProgress).toMatchObject({ progress: 0, unlockedAt: null });
+
+    await db.orm.public.UserStatistics.where({ userId: user.id })
+      .update({ gamesPlayed: 1, wins: 1 });
+    await db.transaction((tx) => updateUserAchievements(tx, user.id));
+    const unlockedProgress = await db.orm.public.UserAchievement
+      .where({ userId: user.id, achievementId: achievement.id })
+      .first();
+    expect(unlockedProgress).toMatchObject({ progress: 1 });
+    expect(unlockedProgress?.unlockedAt).not.toBeNull();
+
+    await db.orm.public.UserStatistics.where({ userId: user.id }).update({ wins: 0 });
+    await db.transaction((tx) => updateUserAchievements(tx, user.id));
+    const repeatedProgress = await db.orm.public.UserAchievement
+      .where({ userId: user.id, achievementId: achievement.id })
+      .all();
+    expect(repeatedProgress).toHaveLength(1);
+    expect(repeatedProgress[0].progress).toBe(1);
+    expect(repeatedProgress[0].unlockedAt).toEqual(unlockedProgress?.unlockedAt);
+  }, 30_000);
+
+  it("updates social achievements when a PostgreSQL friendship is accepted", async () => {
+    const db = requireDatabase();
+    const { acceptFriendshipRequest } = await import("../repository/friendship.repository");
+    const suffix = randomUUID();
+    const requester = await db.orm.public.User.create({
+      username: `it-friend-requester-${suffix}`,
+      email: `it-friend-requester-${suffix}@example.test`,
+      passwordHash: "integration-test-only",
+    });
+    createdUserIds.push(requester.id);
+    const addressee = await db.orm.public.User.create({
+      username: `it-friend-addressee-${suffix}`,
+      email: `it-friend-addressee-${suffix}@example.test`,
+      passwordHash: "integration-test-only",
+    });
+    createdUserIds.push(addressee.id);
+    const achievement = await db.orm.public.Achievement.create({
+      code: `IT_FRIEND_${suffix}`,
+      name: "Integration friendship",
+      description: "Achievement unlocked when an integration friendship is accepted.",
+      category: "SOCIAL",
+      requirementType: "FRIENDS_COUNT",
+      requirementValue: 1,
+      isActive: true,
+    });
+    createdAchievementIds.push(achievement.id);
+    const friendship = await db.orm.public.Friendship.create({
+      requesterId: requester.id,
+      addresseeId: addressee.id,
+      status: "PENDING",
+      respondedAt: null,
+    });
+
+    await expect(acceptFriendshipRequest(friendship.id, addressee.id))
+      .resolves.toMatchObject({ friendship: { status: "ACCEPTED" } });
+    const progress = await Promise.all([requester.id, addressee.id].map((userId) =>
+      db.orm.public.UserAchievement.where({ userId, achievementId: achievement.id }).first()
+    ));
+    expect(progress.map((row) => ({
+      progress: row?.progress,
+      unlocked: row?.unlockedAt !== null && row?.unlockedAt !== undefined,
+    }))).toEqual([
+      { progress: 1, unlocked: true },
+      { progress: 1, unlocked: true },
+    ]);
+  }, 30_000);
+
   it("applies a rated resignation once and emits notifications once under concurrent finish attempts", async () => {
     const db = requireDatabase();
     const { game, whiteUser, blackUser, white, black } = await createRatedGameFixture();
+    const achievement = await db.orm.public.Achievement.create({
+      code: `IT_GAME_WIN_${randomUUID()}`,
+      name: "Integration game win",
+      description: "Achievement unlocked by the PostgreSQL game-finished test.",
+      category: "WINS",
+      requirementType: "WINS",
+      requirementValue: 1,
+      isActive: true,
+    });
+    createdAchievementIds.push(achievement.id);
     const notifications: number[] = [];
     const unsubscribe = subscribeToNotifications((notification) => {
       if (notification.userId === whiteUser.id || notification.userId === blackUser.id) {
@@ -316,6 +613,23 @@ describe.skipIf(!testDatabaseUrl)("PostgreSQL game-finished integration", () => 
       ]);
       expect(await db.orm.public.GamePlayerStatistic.where({ gameId: game.id }).all())
         .toHaveLength(2);
+      const achievements = await Promise.all([
+        db.orm.public.UserAchievement.where({
+          userId: whiteUser.id,
+          achievementId: achievement.id,
+        }).first(),
+        db.orm.public.UserAchievement.where({
+          userId: blackUser.id,
+          achievementId: achievement.id,
+        }).first(),
+      ]);
+      expect(achievements.map((progress) => ({
+        progress: progress?.progress,
+        unlocked: progress?.unlockedAt !== null && progress?.unlockedAt !== undefined,
+      }))).toEqual([
+        { progress: 1, unlocked: true },
+        { progress: 0, unlocked: false },
+      ]);
 
       await db.transaction((tx) => finalizeGameFinishedEffects(tx, {
         id: game.id,
@@ -713,6 +1027,16 @@ describe.skipIf(!testDatabaseUrl)("PostgreSQL game-finished integration", () => 
         eliminatedAt: null,
       })
     ));
+    const tournamentAchievement = await db.orm.public.Achievement.create({
+      code: `IT_TOURNAMENT_PLAYED_${randomUUID()}`,
+      name: "Integration tournament",
+      description: "Achievement unlocked when an integration tournament is finished.",
+      category: "TOURNAMENT",
+      requirementType: "TOURNAMENTS_PLAYED",
+      requirementValue: 1,
+      isActive: true,
+    });
+    createdAchievementIds.push(tournamentAchievement.id);
     const now = Temporal.Now.instant();
     const round = await db.orm.public.TournamentRound.create({
       tournamentId: tournament.id,
@@ -788,6 +1112,19 @@ describe.skipIf(!testDatabaseUrl)("PostgreSQL game-finished integration", () => 
     }))).toEqual([
       { rating: 1516, gamesPlayed: 1, wins: 1, losses: 0 },
       { rating: 1484, gamesPlayed: 1, wins: 0, losses: 1 },
+    ]);
+    const tournamentProgress = await Promise.all(players.map((player) =>
+      db.orm.public.UserAchievement.where({
+        userId: player.id,
+        achievementId: tournamentAchievement.id,
+      }).first()
+    ));
+    expect(tournamentProgress.map((progress) => ({
+      progress: progress?.progress,
+      unlocked: progress?.unlockedAt !== null && progress?.unlockedAt !== undefined,
+    }))).toEqual([
+      { progress: 1, unlocked: true },
+      { progress: 1, unlocked: true },
     ]);
   }, 30_000);
 

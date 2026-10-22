@@ -70,12 +70,13 @@ export async function updateUserAchievements(tx: Transaction, userId: number) {
     const unlockedAt = toTemporal(unlocked ? new Date() : new Date(0));
     const update = db.raw.sql`
       INSERT INTO "public"."UserAchievement"
-        ("userId", "achievementId", "progress", "unlockedAt")
+        ("userId", "achievementId", "progress", "unlockedAt", "updatedAt")
       VALUES (
         ${userId},
         ${achievement.id},
         ${currentValue},
-        CASE WHEN ${unlocked} THEN ${unlockedAt.toString()}::timestamptz ELSE NULL END
+        CASE WHEN ${unlocked} THEN ${unlockedAt.toString()}::timestamptz ELSE NULL END,
+        NOW()
       )
       ON CONFLICT ("userId", "achievementId") DO UPDATE SET
         "progress" = GREATEST("UserAchievement"."progress", EXCLUDED."progress"),

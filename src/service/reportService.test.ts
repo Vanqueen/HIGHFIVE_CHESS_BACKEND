@@ -78,11 +78,75 @@ describe("ReportService", () => {
     expect(mocks.createReport).not.toHaveBeenCalled();
   });
 
+  it("rejects self-reporting and multiple targets", async () => {
+    await expect(ReportService.create(1, {
+      reportedUserId: 1,
+      reason: "OTHER",
+    })).rejects.toMatchObject({ statusCode: 422 });
+
+    await expect(ReportService.create(1, {
+      reportedUserId: 2,
+      gameId: 9,
+      messageId: 4,
+      reason: "OTHER",
+    })).rejects.toMatchObject({ statusCode: 422 });
+    expect(mocks.createReport).not.toHaveBeenCalled();
+  });
+
+  it("reports the author of a message only when the reporter is a participant", async () => {
+    mocks.findMessage.mockResolvedValue({
+      id: 4,
+      conversationId: 12,
+      senderId: 2,
+      deletedAt: null,
+    });
+    mocks.findConversationParticipants.mockResolvedValue([{ userId: 1 }, { userId: 2 }]);
+
+    await ReportService.create(1, { messageId: 4, reason: "HARASSMENT" });
+
+    expect(mocks.createReport).toHaveBeenCalledWith(expect.objectContaining({
+      reporterId: 1,
+      reportedUserId: 2,
+      messageId: 4,
+    }));
+  });
+
+  it("rejects reports about messages outside the reporter's conversation", async () => {
+    mocks.findMessage.mockResolvedValue({
+      id: 4,
+      conversationId: 12,
+      senderId: 2,
+      deletedAt: null,
+    });
+    mocks.findConversationParticipants.mockResolvedValue([{ userId: 2 }, { userId: 3 }]);
+
+    await expect(ReportService.create(1, { messageId: 4, reason: "SPAM" }))
+      .rejects.toMatchObject({ statusCode: 403 });
+    expect(mocks.createReport).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid reasons and out-of-range list limits", async () => {
+    await expect(ReportService.create(1, {
+      reportedUserId: 2,
+      reason: "NOT_A_REASON" as "OTHER",
+    })).rejects.toMatchObject({ statusCode: 422 });
+    await expect(ReportService.listMine(1, 101))
+      .rejects.toMatchObject({ statusCode: 422 });
+    await expect(ReportService.listForAdmin("INVALID" as "PENDING", 20))
+      .rejects.toMatchObject({ statusCode: 422 });
+  });
+
   it("prevents a report from being closed after another administrator reviewed it", async () => {
     mocks.findReport.mockResolvedValue({ id: 11, status: "RESOLVED" });
 
     await expect(ReportService.review(11, 5, "REJECTED"))
       .rejects.toMatchObject({ statusCode: 409 });
     expect(mocks.reviewReport).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unsupported review status", async () => {
+    await expect(ReportService.review(11, 5, "PENDING"))
+      .rejects.toMatchObject({ statusCode: 422 });
+    expect(mocks.findReport).not.toHaveBeenCalled();
   });
 });

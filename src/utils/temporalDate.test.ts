@@ -1,6 +1,6 @@
 import { Temporal } from "temporal-polyfill";
 import { describe, expect, it } from "vitest";
-import { epochMilliseconds } from "./temporalDate";
+import { epochMilliseconds, toTemporal } from "./temporalDate";
 
 describe("epochMilliseconds", () => {
   it("supports Date and Temporal.Instant timestamps", () => {
@@ -10,5 +10,13 @@ describe("epochMilliseconds", () => {
     expect(epochMilliseconds(Temporal.Instant.fromEpochMilliseconds(milliseconds))).toBe(
       milliseconds,
     );
+  });
+
+  it("converts Date values to Temporal.Instant for timestamptz writes", () => {
+    const date = new Date(1_700_000_000_000);
+    const instant = toTemporal(date);
+
+    expect(instant).toBeInstanceOf(Temporal.Instant);
+    expect(instant.epochMilliseconds).toBe(date.getTime());
   });
 });

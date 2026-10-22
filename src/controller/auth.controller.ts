@@ -1,16 +1,32 @@
 import type { RequestHandler } from "express";
 import { AuthService } from "../service/authService";
 import { requireAdmin, requireCurrentUser, readBody, readParamId, readString } from "./controller.utils";
+import HttpError from "../service/errorService";
 
 export const AuthController = {
   register: (async (request, response) => {
     const body = readBody(request);
-    const role = readString(body, "role");
     const result = await AuthService.register({
       username: readString(body, "username"),
       email: readString(body, "email"),
       password: readString(body, "password"),
-      role: role === "ORGANIZER" || role === "ADMIN" || role === "USER" ? role : "USER",
+      role: "USER",
+    });
+    response.status(201).json(result);
+  }) satisfies RequestHandler,
+
+  createPrivilegedUser: (async (request, response) => {
+    requireAdmin(response);
+    const body = readBody(request);
+    const role = readString(body, "role");
+    if (role !== "ADMIN" && role !== "ORGANIZER") {
+      throw new HttpError("Le rôle doit être ADMIN ou ORGANIZER.", 422, false);
+    }
+    const result = await AuthService.register({
+      username: readString(body, "username"),
+      email: readString(body, "email"),
+      password: readString(body, "password"),
+      role,
     });
     response.status(201).json(result);
   }) satisfies RequestHandler,
