@@ -1,0 +1,293 @@
+[
+  {
+    "id": "column.public.Conversation.gameId",
+    "label": "Add column \"gameId\" to \"Conversation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "gameId",
+        "table": "Conversation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"gameId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "Conversation",
+          "gameId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"gameId\"",
+        "sql": "ALTER TABLE \"public\".\"Conversation\" ADD COLUMN \"gameId\" int4"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"gameId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "Conversation",
+          "gameId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.Game.pendingUndoParticipantId",
+    "label": "Add column \"pendingUndoParticipantId\" to \"Game\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "pendingUndoParticipantId",
+        "table": "Game"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"pendingUndoParticipantId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "Game",
+          "pendingUndoParticipantId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"pendingUndoParticipantId\"",
+        "sql": "ALTER TABLE \"public\".\"Game\" ADD COLUMN \"pendingUndoParticipantId\" int4"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"pendingUndoParticipantId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "Game",
+          "pendingUndoParticipantId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.Move.fenBefore",
+    "label": "Add column \"fenBefore\" to \"Move\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "fenBefore",
+        "table": "Move"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"fenBefore\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "Move",
+          "fenBefore"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"fenBefore\"",
+        "sql": "ALTER TABLE \"public\".\"Move\" ADD COLUMN \"fenBefore\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"fenBefore\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "Move",
+          "fenBefore"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.Conversation.Conversation_gameId_key",
+    "label": "Add unique constraint on \"Conversation\" (gameId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "Conversation_gameId_key",
+        "table": "Conversation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Conversation_gameId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Conversation_gameId_key",
+          "public",
+          "\"public\".\"Conversation\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"Conversation_gameId_key\"",
+        "sql": "ALTER TABLE \"public\".\"Conversation\" ADD CONSTRAINT \"Conversation_gameId_key\" UNIQUE (\"gameId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"Conversation_gameId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Conversation_gameId_key",
+          "public",
+          "\"public\".\"Conversation\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.Game.Game_pendingUndoParticipantId_idx_b4de87a4",
+    "label": "Create index \"Game_pendingUndoParticipantId_idx_b4de87a4\" on \"Game\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "Game_pendingUndoParticipantId_idx_b4de87a4",
+        "table": "Game"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"Game_pendingUndoParticipantId_idx_b4de87a4\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Game_pendingUndoParticipantId_idx_b4de87a4\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"Game_pendingUndoParticipantId_idx_b4de87a4\"",
+        "sql": "CREATE INDEX \"Game_pendingUndoParticipantId_idx_b4de87a4\" ON \"public\".\"Game\" (\"pendingUndoParticipantId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"Game_pendingUndoParticipantId_idx_b4de87a4\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Game_pendingUndoParticipantId_idx_b4de87a4\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.Conversation.Conversation_gameId_fkey",
+    "label": "Add foreign key \"Conversation_gameId_fkey\" on \"Conversation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "Conversation_gameId_fkey",
+        "table": "Conversation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"Conversation_gameId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Conversation_gameId_fkey",
+          "public",
+          "\"public\".\"Conversation\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"Conversation_gameId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"Conversation\"\nADD CONSTRAINT \"Conversation_gameId_fkey\"\nFOREIGN KEY (\"gameId\")\nREFERENCES \"public\".\"Game\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"Conversation_gameId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Conversation_gameId_fkey",
+          "public",
+          "\"public\".\"Conversation\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.Game.Game_pendingUndoParticipantId_fkey",
+    "label": "Add foreign key \"Game_pendingUndoParticipantId_fkey\" on \"Game\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "Game_pendingUndoParticipantId_fkey",
+        "table": "Game"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"Game_pendingUndoParticipantId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Game_pendingUndoParticipantId_fkey",
+          "public",
+          "\"public\".\"Game\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"Game_pendingUndoParticipantId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"Game\"\nADD CONSTRAINT \"Game_pendingUndoParticipantId_fkey\"\nFOREIGN KEY (\"pendingUndoParticipantId\")\nREFERENCES \"public\".\"GameParticipant\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"Game_pendingUndoParticipantId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Game_pendingUndoParticipantId_fkey",
+          "public",
+          "\"public\".\"Game\""
+        ]
+      }
+    ]
+  }
+]

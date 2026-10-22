@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../config/environment.ts";
 import postgres from "@prisma/orm-postgres/runtime";
 
 import "temporal-polyfill/global";
@@ -18,10 +18,18 @@ export const db = postgres<Contract>({
 let connection: Promise<void> | undefined;
 
 export function connectDatabase(): Promise<void> {
-  connection ??= db.connect().then(() => undefined).catch((error: unknown) => {
-    connection = undefined;
-    throw error;
-  });
+  if (!connection) {
+    console.info("[database] Connexion à PostgreSQL...");
+    connection = db.connect()
+      .then(() => {
+        console.info("[database] Connexion PostgreSQL établie.");
+      })
+      .catch((error: unknown) => {
+        connection = undefined;
+        console.error("[database] Échec de la connexion PostgreSQL.", error);
+        throw error;
+      });
+  }
 
   return connection;
 }

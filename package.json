@@ -9,8 +9,10 @@
     "node": "^22.18.0 || >=24.11.0"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "build": "tsdown",
+    "stockfish:check": "npx tsx --trace-warnings src/service/checkStockfish.ts",
+    "stockfish:analyze": "npx tsx --trace-warnings src/service/analyze-game.ts",
     "composer:deploy": "prisma deploy module.ts",
     "composer:dev": "prisma dev module.ts",
     "contract:emit": "prisma contract emit",
@@ -19,35 +21,56 @@
     "db:verify": "prisma db verify",
     "db:push": "prisma db push",
     "db:seed": "npx tsx --trace-warnings src/prisma/run-seed.ts",
+    "admin:bootstrap": "npx tsx --trace-warnings src/prisma/bootstrap-admin.ts",
+    "db:backfill-move-fen": "npx tsx --trace-warnings src/prisma/backfill-move-fen.ts",
     "deploy": "npm run build && npm run composer:deploy",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --trace-warnings src/index.ts",
     "dev:composer": "npm run build && npm run composer:dev",
     "migrate": "prisma db migrate",
     "migration:plan": "prisma migration plan",
     "migration:show": "prisma migration show",
     "migration:status": "prisma migration status",
     "start": "node dist/server.mjs",
-    "serve": "nodemon src/index.ts"
+    "serve": "tsx watch --trace-warnings src/index.ts"
   },
   "dependencies": {
     "@prisma/composer": "0.24.0",
     "@prisma/composer-prisma-cloud": "0.24.0",
     "@prisma/orm-postgres": "8.0.0-rc.12",
     "alchemy": "2.0.0-beta.78",
+    "argon2": "^0.45.1",
+    "bcryptjs": "^3.0.3",
+    "chess.js": "^1.4.0",
+    "cloudinary": "^2.11.0",
+    "compression": "^1.8.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "crypto": "^1.0.1",
     "dotenv": "^18.0.5",
     "express": "^5.2.1",
+    "express-fileupload": "^1.5.2",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
     "http": "^0.0.1-security",
+    "https": "^1.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^10.0.15",
+    "path": "^0.12.7",
+    "socket.io": "^4.8.4",
     "temporal-polyfill": "^1.0.4"
   },
   "devDependencies": {
     "@prisma/dev": "0.25.2",
+    "@types/express-fileupload": "^1.5.1",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.9.9",
-    "nodemon": "^3.1.14",
     "prisma": "8.0.0-rc.18",
+    "socket.io-client": "^4.8.4",
     "ts-node": "^10.9.2",
     "tsdown": "^0.22.14",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
   },
   "overrides": {
     "effect": "4.0.0-rc.115",
@@ -56,6 +79,14 @@
     "@effect/platform-node-shared": "4.0.0-rc.115",
     "@effect/sql-d1": "4.0.0-rc.115",
     "@effect/sql-sqlite-do": "4.0.0-rc.115",
-    "@effect/vitest": "4.0.0-rc.115"
+    "@effect/vitest": "4.0.0-rc.115",
+    "hono": "^4.13.7",
+    "@hono/node-server": "^1.19.15",
+    "lodash": "^4.18.1",
+    "valibot": "^1.4.2"
+  },
+  "allowScripts": {
+    "argon2@0.45.1": true,
+    "esbuild@0.28.2": true
   }
 }

@@ -15,5 +15,5 @@
       "node"
     ]
   },
-  "include": ["src/**/*.ts", "tsdown.config.ts", "prisma.config.ts"]
+  "include": ["src/**/*.ts", "tsdown.config.ts", "src/utils/hash.util.ts", ]
 }

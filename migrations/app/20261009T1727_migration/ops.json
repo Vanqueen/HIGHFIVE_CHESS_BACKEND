@@ -1,0 +1,170 @@
+[
+  {
+    "id": "column.public.User.emailChangeCodeHash",
+    "label": "Add column \"emailChangeCodeHash\" to \"User\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "emailChangeCodeHash",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"emailChangeCodeHash\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "emailChangeCodeHash"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"emailChangeCodeHash\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD COLUMN \"emailChangeCodeHash\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"emailChangeCodeHash\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "emailChangeCodeHash"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.User.emailChangeExpiresAt",
+    "label": "Add column \"emailChangeExpiresAt\" to \"User\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "emailChangeExpiresAt",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"emailChangeExpiresAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "emailChangeExpiresAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"emailChangeExpiresAt\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD COLUMN \"emailChangeExpiresAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"emailChangeExpiresAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "emailChangeExpiresAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.User.pendingEmail",
+    "label": "Add column \"pendingEmail\" to \"User\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "pendingEmail",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"pendingEmail\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "pendingEmail"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"pendingEmail\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD COLUMN \"pendingEmail\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"pendingEmail\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "pendingEmail"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.User.User_pendingEmail_key",
+    "label": "Add unique constraint on \"User\" (pendingEmail)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "User_pendingEmail_key",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"User_pendingEmail_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "User_pendingEmail_key",
+          "public",
+          "\"public\".\"User\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"User_pendingEmail_key\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD CONSTRAINT \"User_pendingEmail_key\" UNIQUE (\"pendingEmail\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"User_pendingEmail_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "User_pendingEmail_key",
+          "public",
+          "\"public\".\"User\""
+        ]
+      }
+    ]
+  }
+]

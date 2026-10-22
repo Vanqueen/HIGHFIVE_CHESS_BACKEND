@@ -1,0 +1,30 @@
+export const GAME_EVENTS = {
+  STATE: "game-state",
+  UPDATED: "game-updated",
+  TIMER_UPDATE: "timer-update",
+  OFFER_DRAW: "offer-draw",
+  RESPOND_DRAW: "respond-draw",
+  REQUEST_UNDO: "request-undo",
+  RESPOND_UNDO: "respond-undo",
+  RESIGN: "resign",
+  CLAIM_NO_SHOW: "claim-no-show",
+} as const;
+
+export const GAME_ACTIONS = {
+  STARTED: "started",
+  DRAW_OFFERED: "draw-offered",
+  DRAW_ACCEPTED: "draw-accepted",
+  DRAW_DECLINED: "draw-declined",
+  UNDO_REQUESTED: "undo-requested",
+  UNDO_ACCEPTED: "undo-accepted",
+  UNDO_DECLINED: "undo-declined",
+  RESIGNED: "resigned",
+  NO_SHOW_DRAW: "no-show-draw",
+  NO_SHOW_WIN: "no-show-win",
+  NO_SHOW_CANCELLED: "no-show-cancelled",
+  TIMEOUT: "timeout",
+  CHALLENGE_ACCEPTED: "challenge-accepted",
+  CHALLENGE_DECLINED: "challenge-declined",
+  CHALLENGE_CANCELLED: "challenge-cancelled",
+  CHALLENGE_EXPIRED: "challenge-expired",
+} as const;

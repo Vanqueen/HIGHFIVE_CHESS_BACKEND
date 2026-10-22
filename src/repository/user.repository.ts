@@ -1,4 +1,5 @@
 import { db } from "../prisma/db.ts";
+import { toTemporal } from "../utils/temporalDate.ts";
 
 // ─── Read ────────────────────────────────────────────────────────────────────
 
@@ -14,8 +15,31 @@ export async function findUserByUsername(username: string) {
   return db.orm.public.User.where({ username }).first();
 }
 
+export async function searchActiveUsers(username: string, limit = 10) {
+  return db.orm.public.User
+    .select("id", "username", "avatarUrl")
+    .where({ accountStatus: "ACTIVE", deletedAt: null })
+    .where((user) => user.username.ilike(`%${username}%`))
+    .orderBy((user) => user.username.asc())
+    .limit(limit)
+    .all();
+}
+
 export async function findUsers(limit = 10) {
-  return db.orm.public.User.select("id", "email", "username", "createdAt")
+  return db.orm.public.User.select(
+    "id",
+    "email",
+    "username",
+    "avatarUrl",
+    "role",
+    "accountStatus",
+    "connectionStatus",
+    "lastLoginAt",
+    "createdAt",
+    "updatedAt",
+  )
+    .where({ deletedAt: null })
+    .orderBy((user) => user.createdAt.desc())
     .limit(limit)
     .all();
 }
@@ -37,7 +61,6 @@ export async function createUser(
     role,
     accountStatus,
     avatarUrl: avatarUrl ?? null,
-    createdAt: new Date(),
   });
 }
 
@@ -82,25 +105,102 @@ export async function updateEmail(id: number, email: string) {
   return db.orm.public.User.where({ id }).update({ email });
 }
 
+export async function savePendingEmailChange(
+  id: number,
+  email: string,
+  codeHash: string,
+  expiresAt: Date,
+) {
+  return db.orm.public.User.where({ id }).update({
+    pendingEmail: email,
+    emailChangeCodeHash: codeHash,
+    emailChangeExpiresAt: toTemporal(expiresAt),
+  });
+}
+
+export async function completePendingEmailChange(
+  id: number,
+  email: string,
+  codeHash: string,
+  expiresAt: Date,
+) {
+  return db.transaction(async (tx) => {
+    const updated = await tx.orm.public.User
+      .where({
+        id,
+        deletedAt: null,
+        pendingEmail: email,
+        emailChangeCodeHash: codeHash,
+        emailChangeExpiresAt: toTemporal(expiresAt),
+      })
+      .update({
+        email,
+        pendingEmail: null,
+        emailChangeCodeHash: null,
+        emailChangeExpiresAt: null,
+        connectionStatus: "OFFLINE",
+      });
+
+    if (!updated) return false;
+
+    const now = new Date();
+    await tx.orm.public.Session.where({ userId: id, revokedAt: null })
+      .update({ revokedAt: toTemporal(now) });
+    await tx.orm.public.RefreshToken.where({ userId: id, revokedAt: null })
+      .update({ revokedAt: toTemporal(now) });
+    return true;
+  });
+}
+
+export async function clearPendingEmailChange(id: number, codeHash: string) {
+  return db.orm.public.User.where({ id, emailChangeCodeHash: codeHash }).update({
+    pendingEmail: null,
+    emailChangeCodeHash: null,
+    emailChangeExpiresAt: null,
+  });
+}
+
 export async function updateUsername(id: number, username: string) {
   return db.orm.public.User.where({ id }).update({ username });
 }
 
-export async function updateAvatar(id: number, avatarUrl: string | null) {
-  return db.orm.public.User.where({ id }).update({ avatarUrl });
+export async function updateAvatar(
+  id: number,
+  avatarUrl: string | null,
+  avatarPublicId: string | null,
+) {
+  return db.orm.public.User.where({ id }).update({ avatarUrl, avatarPublicId });
 }
 
 // ─── Login tracking ──────────────────────────────────────────────────────────
 
 export async function recordLogin(id: number) {
   return db.orm.public.User.where({ id }).update({
-    lastLoginAt: new Date(),
+    lastLoginAt: toTemporal(new Date()),
     failedLoginAttempts: 0,
   });
 }
 
-export async function recordFailedLogin(id: number, attempts: number) {
-  return db.orm.public.User.where({ id }).update({ failedLoginAttempts: attempts });
+export async function recordFailedLogin(id: number, maxAttempts: number, lockedUntil: Date) {
+  const plan = db.raw.sql`
+    UPDATE "public"."User"
+    SET
+      "failedLoginAttempts" = CASE
+        WHEN "lockedUntil" IS NOT NULL AND "lockedUntil" <= NOW() THEN 1
+        ELSE "failedLoginAttempts" + 1
+      END,
+      "lockedUntil" = CASE
+        WHEN CASE
+          WHEN "lockedUntil" IS NOT NULL AND "lockedUntil" <= NOW() THEN 1
+          ELSE "failedLoginAttempts" + 1
+        END >= ${maxAttempts}
+          THEN GREATEST(COALESCE("lockedUntil", NOW()), ${lockedUntil.toISOString()}::timestamptz)
+        WHEN "lockedUntil" IS NOT NULL AND "lockedUntil" <= NOW() THEN NULL
+        ELSE "lockedUntil"
+      END
+    WHERE "id" = ${id}
+  `.affectedCount().build();
+  return db.runtime().execute(plan);
 }
 
 export async function resetLoginAttempts(id: number) {
@@ -108,7 +208,7 @@ export async function resetLoginAttempts(id: number) {
 }
 
 export async function lockUser(id: number, lockedUntil: Date) {
-  return db.orm.public.User.where({ id }).update({ lockedUntil });
+  return db.orm.public.User.where({ id }).update({ lockedUntil: toTemporal(lockedUntil) });
 }
 
 export async function unlockUser(id: number) {
@@ -118,13 +218,21 @@ export async function unlockUser(id: number) {
 // ─── Connection ───────────────────────────────────────────────────────────────
 
 export async function setConnectionStatus(id: number, connectionStatus: "ONLINE" | "OFFLINE") {
-  return db.orm.public.User.where({ id }).update({ connectionStatus });
+  const updated = await db.orm.public.User
+    .where({
+      id,
+      ...(connectionStatus === "ONLINE"
+        ? { deletedAt: null, accountStatus: "ACTIVE" as const }
+        : {}),
+    })
+    .update({ connectionStatus });
+  return Boolean(updated);
 }
 
 // ─── Soft delete ─────────────────────────────────────────────────────────────
 
 export async function markUserForDeletion(id: number) {
-  return db.orm.public.User.where({ id }).update({ deletedAt: new Date() });
+  return db.orm.public.User.where({ id }).update({ deletedAt: toTemporal(new Date()) });
 }
 
 export async function restoreDeletedUser(id: number) {
