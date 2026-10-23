@@ -15,6 +15,7 @@ peuvent la rejoindre pour recevoir l’état ou envoyer des actions.
 | Client → serveur | `join-game` | `{ gameId }` |
 | Client → serveur | `leave-game` | `{ gameId }` |
 | Serveur → client | `game-state` | Partie, participants, coups et messages |
+| Serveur → salle | `game-ready` | `{ gameId }` quand les deux participants sont connectés |
 | Client → serveur | `move` | `{ gameId, from, to, promotion? }` |
 | Serveur → salle | `move-played` | Partie et coup persistés |
 | Client → serveur | `offer-draw`, `respond-draw` | `gameId`, réponse booléenne |
@@ -28,9 +29,38 @@ peuvent la rejoindre pour recevoir l’état ou envoyer des actions.
 
 Les événements avec callback d’acquittement répondent avec
 `{ success, data?, error? }`. Les durées `BigInt` sont envoyées en chaînes.
-Le compte à rebours démarre lorsque les deux participants requis ont rejoint
-la salle. La session utilisateur ou le ticket invité est revalidé
-périodiquement.
+Les joueurs peuvent jouer le premier coup lorsque les deux participants ont
+rejoint la salle. Le compte à rebours démarre à l'enregistrement du premier
+coup des Blancs. Les coups sont transmis par Socket.IO; la session utilisateur
+ou le ticket invité est revalidé périodiquement.
+
+## Recherche d'un adversaire aléatoire
+
+`POST /api/games/matchmaking` crée une partie d'attente pour le compte connecté
+ou, sans authentification, pour un joueur invité. La requête contient
+`initialTimeSeconds` et `incrementSeconds`. Un invité reçoit un
+`guestSessionToken` nécessaire à la connexion Socket.IO.
+
+Le client transmet ensuite `matchmaking-join` avec `{ gameId }`. Le serveur
+apparie aléatoirement deux recherches connectées ayant la même cadence, attribue
+les couleurs au moment de l'appariement, puis envoie `matchmaking-found` à
+chacun avec sa couleur et son identifiant de participant. Les invités reçoivent
+un jeton de session pour la partie appariée. `matchmaking-cancel` annule une
+recherche en attente; une déconnexion retire aussi le joueur de la file.
+
+Les parties rapides entre deux comptes sont classées. Leur catégorie est
+déduite du contrôle de temps en estimant 40 coups : jusqu'à 180 secondes,
+`BLITZ`; jusqu'à 900 secondes, `RAPID`; au-delà, `CLASSICAL`. Les parties
+impliquant un invité restent non classées. Chaque catégorie commence à 1500 Elo
+et évolue après la fin d'une partie classée.
+
+`GET /api/users/me/ratings` renvoie l'Elo global (moyenne des catégories) et
+les scores `BLITZ`, `RAPID` et `CLASSICAL`. Une catégorie sans historique est
+retournée à 1500 Elo, provisoire.
+
+La file de matchmaking est actuellement conservée en mémoire par le processus
+backend. Un déploiement multi-instance doit partager cette file entre les
+instances pour que les joueurs puissent être appariés entre elles.
 
 ## Chat des parties avec invités
 

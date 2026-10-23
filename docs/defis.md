@@ -22,9 +22,16 @@ Exemple de défi adressé directement à un joueur :
 {
   "invitedUserId": 42,
   "initialTimeSeconds": 600,
-  "incrementSeconds": 5
+  "incrementSeconds": 5,
+  "colorPreference": "RANDOM",
+  "isRated": true
 }
 ```
+
+`colorPreference` accepte `WHITE`, `BLACK` ou `RANDOM` (valeur par défaut).
+Les parties classées (`isRated: true`) sont réservées aux défis adressés à un
+compte joueur et nécessitent une cadence chronométrée. Leur catégorie Elo est
+déduite du contrôle du temps. Les défis ouverts par lien restent amicaux.
 
 Pour créer un défi ouvert à accepter via lien, omettre `invitedUserId` ou lui
 donner `null`. Seul le créateur pourra ensuite créer un lien pour ce défi.

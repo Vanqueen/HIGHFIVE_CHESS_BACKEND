@@ -84,6 +84,8 @@ describe("ChallengeService", () => {
       0,
       "test-user",
       expect.stringMatching(/^(WHITE|BLACK)$/),
+      false,
+      null,
     );
   });
 
@@ -99,6 +101,8 @@ describe("ChallengeService", () => {
       5,
       "test-user",
       expect.stringMatching(/^(WHITE|BLACK)$/),
+      false,
+      null,
     );
   });
 
@@ -113,9 +117,33 @@ describe("ChallengeService", () => {
         0,
         "test-user",
         color,
+        false,
+        null,
       );
     },
   );
+
+  it("creates rated challenges with a category derived from the selected clock", async () => {
+    await ChallengeService.createChallenge(3, 8, 300, 0, "RANDOM", true);
+
+    expect(mocks.createChallengeWithGame).toHaveBeenCalledWith(
+      expect.any(Object),
+      300,
+      0,
+      "test-user",
+      expect.stringMatching(/^(WHITE|BLACK)$/),
+      true,
+      "RAPID",
+    );
+  });
+
+  it("rejects rated challenges without a registered opponent or timed clock", async () => {
+    await expect(ChallengeService.createChallenge(3, null, 300, 0, "RANDOM", true))
+      .rejects.toMatchObject({ statusCode: 422 });
+    await expect(ChallengeService.createChallenge(3, 8, 0, 0, "RANDOM", true))
+      .rejects.toMatchObject({ statusCode: 422 });
+    expect(mocks.createChallengeWithGame).not.toHaveBeenCalled();
+  });
 
   it("rejects an unsupported color preference", async () => {
     await expect(

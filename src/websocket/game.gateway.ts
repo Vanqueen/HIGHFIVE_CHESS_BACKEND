@@ -1,9 +1,11 @@
 import type { Server as HttpServer } from "node:http";
+import { randomInt } from "node:crypto";
 import { Server, type Socket } from "socket.io";
 import { getWebSocketConfig } from "../config/websocket.config";
 import { CONNECTION_EVENTS } from "../events/connection.events";
 import { GAME_ACTIONS, GAME_EVENTS } from "../events/game.events";
 import { GAME_CHAT_EVENTS } from "../events/gameChat.events";
+import { MATCHMAKING_EVENTS } from "../events/matchmaking.events";
 import { MessageBroadcastService } from "../service/messageBroadcastService";
 import { subscribeToGameBroadcasts } from "../events/game.broadcast";
 import { subscribeToNotifications } from "../events/notification.broadcast";
@@ -14,6 +16,7 @@ import { AnonymousGameService } from "../service/anonymousGameService";
 import { GameService } from "../service/gameService";
 import { MoveService } from "../service/moveService";
 import { GameChatService } from "../service/gameChatService";
+import { MatchmakingService } from "../service/matchmakingService";
 import { MessageService } from "../service/messageService";
 import { UserPresenceService } from "../service/userPresenceService";
 import { SocketPresenceRegistry } from "./socket-presence.registry";
@@ -40,6 +43,8 @@ interface ClientToServerEvents {
   ) => void;
   [CONNECTION_EVENTS.JOIN_GAME]: (payload: { gameId: number }, acknowledge?: Acknowledge) => void;
   [CONNECTION_EVENTS.LEAVE_GAME]: (payload: { gameId: number }, acknowledge?: Acknowledge) => void;
+  [MATCHMAKING_EVENTS.JOIN]: (payload: { gameId: number }, acknowledge?: Acknowledge) => void;
+  [MATCHMAKING_EVENTS.CANCEL]: (acknowledge?: Acknowledge) => void;
   [MOVE_EVENTS.PLAY]: (
     payload: {
       gameId: number;
@@ -95,6 +100,7 @@ interface ServerToClientEvents {
     messages: GameChatMessage[];
     game: SerializedGame;
   }) => void;
+  [GAME_EVENTS.READY]: (payload: { gameId: number }) => void;
   [CONNECTION_EVENTS.PLAYER_JOINED]: (payload: { userId?: number; participantId: number }) => void;
   [CONNECTION_EVENTS.PLAYER_LEFT]: (payload: { userId?: number; participantId: number }) => void;
   [CONNECTION_EVENTS.NOTIFICATION]: (payload: unknown) => void;
@@ -113,6 +119,8 @@ interface ServerToClientEvents {
     blackTimeRemainingMs: string;
     activeColor: "WHITE" | "BLACK" | null;
   }) => void;
+  [MATCHMAKING_EVENTS.FOUND]: (payload: unknown) => void;
+  [MATCHMAKING_EVENTS.ERROR]: (payload: { message: string }) => void;
 }
 
 interface SocketData {
@@ -129,6 +137,14 @@ interface SocketData {
 
 type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, never, SocketData>;
 type Acknowledge = (response: { success: boolean; data?: unknown; error?: string }) => void;
+type MatchmakingQueueEntry = {
+  socket: GameSocket;
+  gameId: number;
+  participantId: number;
+  userId: number | null;
+  initialTimeSeconds: number;
+  incrementSeconds: number;
+};
 
 function readPositiveId(value: unknown) {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0
@@ -204,6 +220,7 @@ export function attachGameGateway(httpServer: HttpServer) {
       maxHttpBufferSize: config.maxHttpBufferSize,
     },
   );
+  const matchmakingQueue = new Map<string, MatchmakingQueueEntry>();
   initializeMessageEvents(io);
   const unsubscribeBroadcasts = subscribeToGameBroadcasts((event) => {
     const room = `game:${event.gameId}`;
@@ -517,18 +534,14 @@ export function attachGameGateway(httpServer: HttpServer) {
         await userSocket.join(`game:${gameId}`);
         userSocket.data.joinedGameIds.add(gameId);
         const roomSockets = await io.in(`game:${gameId}`).fetchSockets();
-        const readiness = await GameService.startWhenParticipantsReady(
-          gameId,
-          participant.id,
-          new Set(roomSockets
-            .map((roomSocket) => roomSocket.data.participantId)
-            .filter((id): id is number => typeof id === "number")),
-        );
-        if (readiness.started) {
-          io.to(`game:${gameId}`).emit(GAME_EVENTS.UPDATED, {
-            action: GAME_ACTIONS.STARTED,
-            result: { game: serializeGame(readiness.game) },
-          });
+        const connectedParticipantIds = new Set(roomSockets
+          .map((roomSocket) => roomSocket.data.participantId)
+          .filter((id): id is number => typeof id === "number"));
+        if (
+          state.participants.length === 2 &&
+          state.participants.every((row) => connectedParticipantIds.has(row.id))
+        ) {
+          io.to(`game:${gameId}`).emit(GAME_EVENTS.READY, { gameId });
         }
         const clock = await GameService.getClock(gameId);
         const moves = isGuest
@@ -590,6 +603,153 @@ export function attachGameGateway(httpServer: HttpServer) {
       acknowledge?.({ success: true, data: { gameId } });
     });
 
+    userSocket.on(MATCHMAKING_EVENTS.JOIN, async (payload, acknowledge) => {
+      let entrant: MatchmakingQueueEntry | null = null;
+      let reservedOpponent: MatchmakingQueueEntry | null = null;
+      try {
+        const gameId = readPositiveId(payload?.gameId);
+        if (gameId === null) {
+          throw Object.assign(new Error("Identifiant de partie invalide."), { statusCode: 422 });
+        }
+        const isGuest = userSocket.data.guestParticipantId !== null;
+        if (isGuest) {
+          if (userSocket.data.guestGameId !== gameId) {
+            throw Object.assign(new Error("Cette session invité ne correspond pas à la recherche."), {
+              statusCode: 403,
+            });
+          }
+          await AnonymousGameService.authenticateGuestSession(
+            gameId,
+            userSocket.data.guestParticipantId!,
+          );
+        } else {
+          await authenticateAccessToken(userSocket.data.accessToken);
+        }
+        const state = isGuest
+          ? await GameService.getGameForGuest(gameId, userSocket.data.guestParticipantId!)
+          : await GameService.getGameForUser(gameId, userSocket.data.userId);
+        const participant = state.participants.find((row) =>
+          isGuest
+            ? row.id === userSocket.data.guestParticipantId
+            : row.userId === userSocket.data.userId && row.participantType === "USER",
+        );
+        if (
+          !participant ||
+          state.game.status !== "WAITING" ||
+          state.game.type !== "ONLINE" ||
+          state.game.isRated ||
+          state.game.challengeId !== null ||
+          state.game.tournamentRoundId !== null ||
+          state.participants.length !== 1
+        ) {
+          throw Object.assign(new Error("Cette partie ne peut pas rejoindre la file d'attente."), {
+            statusCode: 409,
+          });
+        }
+        const alreadyQueued = matchmakingQueue.get(userSocket.id);
+        if (alreadyQueued?.gameId === gameId) {
+          acknowledge?.({ success: true, data: { status: "searching" } });
+          return;
+        }
+        if (alreadyQueued) {
+          matchmakingQueue.delete(userSocket.id);
+          await MatchmakingService.cancelQueueGame(alreadyQueued.gameId);
+        }
+
+        entrant = {
+          socket: userSocket,
+          gameId,
+          participantId: participant.id,
+          userId: isGuest ? null : userSocket.data.userId,
+          initialTimeSeconds: state.game.initialTimeSeconds,
+          incrementSeconds: state.game.incrementSeconds,
+        };
+        const candidates = [...matchmakingQueue.values()].filter((candidate) =>
+          candidate.socket.connected &&
+          candidate.gameId !== entrant!.gameId &&
+          candidate.userId !== entrant!.userId &&
+          candidate.initialTimeSeconds === entrant!.initialTimeSeconds &&
+          candidate.incrementSeconds === entrant!.incrementSeconds,
+        );
+        const opponent = candidates.length
+          ? candidates[randomInt(candidates.length)]
+          : undefined;
+        if (!opponent) {
+          matchmakingQueue.set(userSocket.id, entrant);
+          acknowledge?.({ success: true, data: { status: "searching" } });
+          return;
+        }
+
+        matchmakingQueue.delete(opponent.socket.id);
+        reservedOpponent = opponent;
+        const paired = await MatchmakingService.pair(
+          opponent.gameId,
+          entrant.gameId,
+          entrant.userId,
+        );
+        const opponentParticipant = paired.participants.find(
+          (row) => row.id === opponent.participantId,
+        );
+        const entrantParticipant = paired.participants.find((row) =>
+          entrant!.userId === null
+            ? row.participantType === "GUEST" && row.id !== opponentParticipant?.id
+            : row.userId === entrant!.userId,
+        );
+        if (!opponentParticipant || !entrantParticipant) {
+          throw new Error("Les participants du match apparié sont introuvables.");
+        }
+        const notifyMatchedPlayer = (
+          entry: MatchmakingQueueEntry,
+          matchedParticipant: typeof opponentParticipant,
+        ) => {
+          entry.socket.emit(MATCHMAKING_EVENTS.FOUND, serializePayload({
+            game: paired.game,
+            participant: {
+              id: matchedParticipant.id,
+              color: matchedParticipant.color,
+            },
+            ...(paired.guestSessionTokens[matchedParticipant.id]
+              ? { guestSessionToken: paired.guestSessionTokens[matchedParticipant.id] }
+              : {}),
+          }));
+        };
+        notifyMatchedPlayer(opponent, opponentParticipant);
+        notifyMatchedPlayer(entrant, entrantParticipant);
+        reservedOpponent = null;
+        acknowledge?.({ success: true, data: { status: "matched", gameId: paired.game.id } });
+      } catch (error) {
+        const result = acknowledgeError(error, acknowledge);
+        userSocket.emit(MATCHMAKING_EVENTS.ERROR, { message: result.message });
+        for (const failedEntry of [entrant, reservedOpponent]) {
+          if (!failedEntry) continue;
+          matchmakingQueue.delete(failedEntry.socket.id);
+          void MatchmakingService.cancelQueueGame(failedEntry.gameId).catch(
+            (cleanupError: unknown) => {
+              console.error("Erreur lors du nettoyage d'un appariement échoué :", cleanupError);
+            },
+          );
+          if (failedEntry.socket.id !== userSocket.id && failedEntry.socket.connected) {
+            failedEntry.socket.emit(MATCHMAKING_EVENTS.ERROR, { message: result.message });
+          }
+        }
+      }
+    });
+
+    userSocket.on(MATCHMAKING_EVENTS.CANCEL, async (acknowledge) => {
+      const queued = matchmakingQueue.get(userSocket.id);
+      if (!queued) {
+        acknowledge?.({ success: true, data: { status: "not-searching" } });
+        return;
+      }
+      matchmakingQueue.delete(userSocket.id);
+      try {
+        await MatchmakingService.cancelQueueGame(queued.gameId);
+        acknowledge?.({ success: true, data: { status: "cancelled" } });
+      } catch (error) {
+        acknowledgeError(error, acknowledge);
+      }
+    });
+
     userSocket.on(MOVE_EVENTS.PLAY, async (payload, acknowledge) => {
       try {
         const gameId = readPositiveId(payload?.gameId);
@@ -611,7 +771,20 @@ export function attachGameGateway(httpServer: HttpServer) {
         const gameState = isGuest
           ? await GameService.getGameForGuest(gameId, userSocket.data.guestParticipantId!)
           : await GameService.getGameForUser(gameId, userSocket.data.userId);
-        if (gameState.game.status !== "IN_PROGRESS") {
+        if (gameState.game.status === "WAITING") {
+          const roomSockets = await io.in(`game:${gameId}`).fetchSockets();
+          const connectedParticipantIds = new Set(roomSockets
+            .map((roomSocket) => roomSocket.data.participantId)
+            .filter((id): id is number => typeof id === "number"));
+          if (
+            gameState.participants.length !== 2 ||
+            !gameState.participants.every((row) => connectedParticipantIds.has(row.id))
+          ) {
+            throw Object.assign(new Error("Les deux joueurs doivent être prêts avant le premier coup."), {
+              statusCode: 409,
+            });
+          }
+        } else if (gameState.game.status !== "IN_PROGRESS") {
           throw Object.assign(new Error("La partie attend encore que ses joueurs soient prêts."), {
             statusCode: 409,
           });
@@ -647,17 +820,14 @@ export function attachGameGateway(httpServer: HttpServer) {
           stopClock(gameId);
           return;
         }
-        const state = isGuest
-          ? await GameService.getGameForGuest(gameId, userSocket.data.guestParticipantId!)
-          : await GameService.getGameForUser(gameId, userSocket.data.userId);
         const serializedResult = {
-          game: serializeGame(state.game),
+          game: serializeGame(result.game),
           move: result.move,
         };
         io.to(`game:${gameId}`).emit(MOVE_EVENTS.PLAYED, {
           ...serializedResult,
         });
-        if (state.game.status === "FINISHED") stopClock(gameId);
+        if (result.game.status === "FINISHED") stopClock(gameId);
         acknowledge?.({ success: true, data: serializedResult });
       } catch (error) {
         const result = acknowledgeError(error, acknowledge);
@@ -848,6 +1018,13 @@ export function attachGameGateway(httpServer: HttpServer) {
 
     userSocket.on(CONNECTION_EVENTS.DISCONNECTING, () => {
       clearInterval(sessionCheck);
+      const queued = matchmakingQueue.get(userSocket.id);
+      if (queued) {
+        matchmakingQueue.delete(userSocket.id);
+        void MatchmakingService.cancelQueueGame(queued.gameId).catch((error: unknown) => {
+          console.error("Erreur lors du nettoyage d'une recherche de partie :", error);
+        });
+      }
       if (userSocket.data.userId > 0) {
         userPresence.remove(userSocket.data.userId, userSocket.id);
         void synchronizePresence(userSocket.data.userId).catch((error) => {

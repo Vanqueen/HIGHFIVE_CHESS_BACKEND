@@ -27,17 +27,19 @@ sens, la consommation est refusée. Les acceptations anonymes ne sont pas
 concernées, car elles n'ont pas d'identité de compte à vérifier. Pour les règles
 complètes, voir [Social et blocages](./social-et-blocages.md).
 
-## Partie anonyme contre anonyme
+## Partie créée par un invité contre un compte ou un autre invité
 
 1. Appeler `POST /api/invitation-links/anonymous` avec
    `{ "initialTimeSeconds": 300, "incrementSeconds": 0 }`.
+   Aucun jeton préexistant ni compte n'est requis pour la création.
 2. Le créateur reçoit un `guestSessionToken` pour sa place et un `inviteToken`
    à transmettre à l'autre joueur, ainsi que sa place (`participant`) pour
    rejoindre immédiatement la partie.
 3. Le second joueur appelle `POST /api/invitation-links/anonymous/redeem`
    avec `{ "token": "..." }`. Sans compte, la réponse fournit son propre
    `guestSessionToken`; si le joueur est connecté, sa place est associée à son
-   compte et il continue avec son jeton d'accès normal.
+   compte et il continue avec son jeton d'accès normal. Le créateur invité peut
+   donc envoyer le lien directement à un ami authentifié.
 4. Les joueurs ouvrent une connexion Socket.IO avec
    leur jeton respectif, puis rejoignent la partie. Le serveur accepte ainsi
    les combinaisons compte/compte, compte/invité, invité/invité et
@@ -76,12 +78,16 @@ en utilisant leur `participantId` plutôt qu'un `userId`, sans créer de compte.
 | `GET` | `/api/challenges/:challengeId/invitation-links` | Créateur authentifié | Lister les métadonnées des liens |
 | `DELETE` | `/api/challenges/:challengeId/invitation-links/:linkId` | Créateur authentifié | Révoquer un lien actif |
 | `POST` | `/api/invitation-links/redeem` | Public; Bearer facultatif | Accepter un défi ouvert comme compte ou invité |
-| `POST` | `/api/invitation-links/anonymous` | Public | Créer une partie anonyme et son lien d'invitation |
+| `POST` | `/api/invitation-links/anonymous` | Public, sans authentification | Créer une partie anonyme et son lien d'invitation; un éventuel jeton Bearer n'est pas vérifié |
 | `POST` | `/api/invitation-links/anonymous/redeem` | Public | Rejoindre une partie anonyme |
 | `GET` | `/api/games/guest/:gameId/moves` | Ticket invité Bearer | Consulter les coups de sa partie |
 | `POST` | `/api/games/guest/:gameId/moves` | Ticket invité Bearer | Jouer un coup et diffuser la mise à jour |
 | `GET` | `/api/games/guest/:gameId/messages` | Ticket invité Bearer | Consulter le chat de sa partie |
 | `POST` | `/api/games/guest/:gameId/messages` | Ticket invité Bearer | Envoyer un message temporaire |
+
+Pour créer une partie publique, le client omet explicitement le jeton d'accès
+local et désactive le renouvellement automatique de session sur cette requête.
+Un jeton expiré ne doit pas bloquer la création d'une partie anonyme.
 
 La création accepte un champ optionnel `expiresInMinutes`, entre 1 et 30. Le
 lien ne peut jamais expirer après son défi. Chaque lien de défi a

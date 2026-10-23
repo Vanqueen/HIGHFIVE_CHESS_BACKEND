@@ -1,4 +1,5 @@
 import { db } from "../prisma/db.ts";
+import { oppositeChessColor, type ChessColor } from "../utils/chessColor";
 import { toTemporal } from "../utils/temporalDate.ts";
 
 const STANDARD_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -6,6 +7,7 @@ const STANDARD_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -
 export async function createAnonymousGame(
   initialTimeSeconds: number,
   incrementSeconds: number,
+  creatorColor: ChessColor,
 ) {
   return db.transaction(async (tx) => {
     const now = new Date();
@@ -30,7 +32,7 @@ export async function createAnonymousGame(
     const participant = await tx.orm.public.GameParticipant.create({
       gameId: game.id,
       participantType: "GUEST",
-      color: "WHITE",
+      color: creatorColor,
       userId: null,
       tournamentParticipantId: null,
       displayName: null,
@@ -50,7 +52,7 @@ export async function joinAnonymousGame(gameId: number, userId: number | null = 
     const participant = await tx.orm.public.GameParticipant.create({
       gameId,
       participantType: userId === null ? "GUEST" : "USER",
-      color: "BLACK",
+      color: oppositeChessColor(participants[0].color),
       userId,
       tournamentParticipantId: null,
       displayName: null,

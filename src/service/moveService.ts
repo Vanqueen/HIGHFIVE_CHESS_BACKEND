@@ -191,7 +191,6 @@ export class MoveService {
       }
 
       const pastMoves = await findMovesByGameId(gameId);
-      const ply = pastMoves.length + 1;
 
       const historyChess = new Chess(STANDARD_START_FEN);
       for (const pastMove of pastMoves) {
@@ -245,7 +244,7 @@ export class MoveService {
         terminationReason = "FIFTY_MOVE_RULE";
       }
 
-      if (game.initialTimeSeconds > 0) {
+      if (game.initialTimeSeconds > 0 && game.status === "IN_PROGRESS") {
         const incrementMs = BigInt(game.incrementSeconds) * 1000n;
         if (movingColor === "WHITE") {
           whiteTimeRemainingMs += incrementMs;
@@ -262,7 +261,6 @@ export class MoveService {
         {
           gameId,
           participantId: participant.id,
-          ply,
           moveNumber: playedMove.color === "w" ? chess.moveNumber() : chess.moveNumber() - 1,
           san: playedMove.san,
           from: playedMove.from,

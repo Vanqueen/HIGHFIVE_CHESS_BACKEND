@@ -3,6 +3,7 @@ import type { UploadedFile } from "express-fileupload";
 import { UserService } from "../service/userService";
 import { StatisticsService } from "../service/statisticsService";
 import { getUserAchievements } from "../service/achievementService";
+import { RatingService } from "../service/ratingService";
 import {
   readBody,
   readParamId,
@@ -45,6 +46,11 @@ export const UserController = {
   getMyStatistics: (async (_request, response) => {
     const user = requireCurrentUser(response);
     response.status(200).json(await StatisticsService.getForUser(user.id));
+  }) satisfies RequestHandler,
+
+  getMyRatings: (async (_request, response) => {
+    const user = requireCurrentUser(response);
+    response.status(200).json(await RatingService.getForUser(user.id));
   }) satisfies RequestHandler,
 
   getMyAchievements: (async (_request, response) => {

@@ -63,36 +63,6 @@ function calculateClock(game: GameRecord, at = Date.now()) {
 }
 
 export class GameService {
-  static async startWhenParticipantsReady(
-    gameId: number,
-    participantId: number,
-    connectedParticipantIds: ReadonlySet<number>,
-  ) {
-    try {
-      const game = await findGame(gameId);
-      if (!game) throw new HttpError("Partie introuvable.", 404, false);
-      const participants = await findGameParticipantsByGameId(gameId);
-      if (!participants.some((participant) => participant.id === participantId)) {
-        throw new HttpError("Vous ne participez pas à cette partie.", 403, false);
-      }
-      if (
-        game.status !== "WAITING" ||
-        participants.length !== 2 ||
-        !participants.every((participant) => connectedParticipantIds.has(participant.id))
-      ) {
-        return { game, started: false };
-      }
-
-      const startedGame = await startGameClock(gameId);
-      if (startedGame) return { game: startedGame, started: true };
-      const latestGame = await findGame(gameId);
-      if (!latestGame) throw new HttpError("Partie introuvable après son démarrage.", 500, false);
-      return { game: latestGame, started: false };
-    } catch (error) {
-      rethrowServiceError(error, "Erreur lors du démarrage de la partie :");
-    }
-  }
-
   static async startWhenReady(
     gameId: number,
     userId: number,

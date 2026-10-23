@@ -4,6 +4,7 @@ import type { NotificationBroadcast } from "../events/notification.broadcast";
 import { createNotificationInTransaction } from "./notification.repository";
 import { toTemporal } from "../utils/temporalDate.ts";
 import { oppositeChessColor, type ChessColor } from "../utils/chessColor.ts";
+import type { RatingCategory } from "../utils/ratingCategory";
 
 type CreateChallengeData = Parameters<typeof db.orm.public.Challenge.create>[0];
 type CreateChallengeWithGameData = Omit<CreateChallengeData, "expiresAt"> & { expiresAt: Date };
@@ -50,6 +51,8 @@ export async function createChallengeWithGame(
   incrementSeconds: number,
   creatorUsername: string,
   creatorColor: ChessColor,
+  isRated = false,
+  ratingCategory: RatingCategory | null = null,
 ) {
   // Keep the challenge, its waiting game and the creator's seat consistent on failure.
   return db.transaction(async (tx) => {
@@ -77,8 +80,8 @@ export async function createChallengeWithGame(
     const game = await tx.orm.public.Game.create({
       type: "CHALLENGE",
       status: "WAITING",
-      isRated: false,
-      ratingCategory: null,
+      isRated,
+      ratingCategory,
       initialTimeSeconds,
       incrementSeconds,
       whiteTimeRemainingMs: BigInt(initialTimeSeconds) * 1000n,

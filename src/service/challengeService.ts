@@ -19,6 +19,7 @@ import {
 } from "./challengeExpirationService";
 import { publishGameBroadcast } from "../events/game.broadcast";
 import { GAME_ACTIONS } from "../events/game.events";
+import { ratingCategoryForTimeControl } from "../utils/ratingCategory";
 import HttpError, { rethrowServiceError } from "./errorService";
 
 const CHALLENGE_LIFETIME_MS = 30 * 60 * 1000;
@@ -55,9 +56,20 @@ export class ChallengeService {
     initialTimeSeconds: number,
     incrementSeconds = 0,
     colorPreference: ColorPreference = "RANDOM",
+    isRated = false,
   ) {
     try {
       assertTimeControl(initialTimeSeconds, incrementSeconds);
+      if (typeof isRated !== "boolean") {
+        throw new HttpError("Mode de jeu invalide.", 422, false);
+      }
+      if (isRated && (invitedUserId === null || initialTimeSeconds === 0)) {
+        throw new HttpError(
+          "Une partie classée nécessite un adversaire connecté et une cadence chronométrée.",
+          422,
+          false,
+        );
+      }
       if (
         colorPreference !== "WHITE" &&
         colorPreference !== "BLACK" &&
@@ -95,7 +107,13 @@ export class ChallengeService {
         invitedUserId,
         status: "PENDING",
         expiresAt: new Date(Date.now() + CHALLENGE_LIFETIME_MS),
-      }, initialTimeSeconds, incrementSeconds, creator.username, creatorColor);
+      },
+      initialTimeSeconds,
+      incrementSeconds,
+      creator.username,
+      creatorColor,
+      isRated,
+      isRated ? ratingCategoryForTimeControl(initialTimeSeconds, incrementSeconds) : null);
       NotificationService.publishMany(created.notifications);
       return {
         challenge: created.challenge,

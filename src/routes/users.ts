@@ -10,6 +10,7 @@ usersRouter.use(authenticate);
 usersRouter.get("/", requireRole("ADMIN"), UserController.getAllUsers);
 usersRouter.get("/search", UserController.searchUsers);
 usersRouter.get("/me/statistics", UserController.getMyStatistics);
+usersRouter.get("/me/ratings", UserController.getMyRatings);
 usersRouter.get("/me/achievements", UserController.getMyAchievements);
 usersRouter.get("/me", authenticate, async (req, res) => {
   try {

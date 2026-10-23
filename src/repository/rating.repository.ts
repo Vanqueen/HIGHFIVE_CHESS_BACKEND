@@ -11,6 +11,10 @@ export async function findRatings(limit = 100) {
   return db.orm.public.Rating.limit(limit).all();
 }
 
+export async function findRatingsByUserId(userId: number) {
+  return db.orm.public.Rating.where({ userId }).all();
+}
+
 export async function createRating(data: CreateRatingData) {
   return db.orm.public.Rating.create(data);
 }

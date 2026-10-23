@@ -1,6 +1,10 @@
+import { randomInt } from "node:crypto";
 import { joinAnonymousGame, createAnonymousGame, findGuestParticipant } from "../repository/guest-game.repository";
+import type { ChessColor } from "../utils/chessColor";
 import { signGuestGameToken, verifyGuestGameToken } from "../utils/guestGameToken";
 import HttpError, { rethrowServiceError } from "./errorService";
+
+type ColorPreference = ChessColor | "RANDOM";
 
 const MAX_INITIAL_TIME_SECONDS = 2 * 60 * 60;
 const MAX_INCREMENT_SECONDS = 180;
@@ -22,12 +26,27 @@ function validateTimeControl(initialTimeSeconds: number, incrementSeconds: numbe
 }
 
 export class AnonymousGameService {
-  static async createGame(initialTimeSeconds: number, incrementSeconds = 0) {
+  static async createGame(
+    initialTimeSeconds: number,
+    incrementSeconds = 0,
+    colorPreference: ColorPreference = "RANDOM",
+  ) {
     try {
       validateTimeControl(initialTimeSeconds, incrementSeconds);
+      if (
+        colorPreference !== "WHITE" &&
+        colorPreference !== "BLACK" &&
+        colorPreference !== "RANDOM"
+      ) {
+        throw new HttpError("Choix de couleur invalide.", 422, false);
+      }
+      const creatorColor: ChessColor = colorPreference === "RANDOM"
+        ? (randomInt(2) === 0 ? "WHITE" : "BLACK")
+        : colorPreference;
       const { game, participant } = await createAnonymousGame(
         initialTimeSeconds,
         incrementSeconds,
+        creatorColor,
       );
       return {
         game,

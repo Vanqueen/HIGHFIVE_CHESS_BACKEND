@@ -79,13 +79,13 @@ describe("MoveService.playMove", () => {
     ]);
     expect(move).toMatchObject({
       participantId: 1,
-      ply: 1,
       moveNumber: 1,
       san: "e4",
       from: "e2",
       to: "e4",
       promotion: null,
     });
+    expect(move).not.toHaveProperty("ply");
     expect(updates).toMatchObject({
       status: "IN_PROGRESS",
       activeColor: "BLACK",
@@ -172,6 +172,28 @@ describe("MoveService.playMove", () => {
     mocks.findGame.mockResolvedValue({
       id: 41,
       currentFen: START_FEN,
+      status: "IN_PROGRESS",
+      activeColor: "WHITE",
+      pendingUndoParticipantId: null,
+      initialTimeSeconds: 60,
+      incrementSeconds: 2,
+      whiteTimeRemainingMs: 60_000n,
+      blackTimeRemainingMs: 60_000n,
+      clockStartedAt: new Date(Date.now() + 1_000),
+    });
+
+    await MoveService.playMove(41, 7, { from: "e2", to: "e4" });
+
+    const [, , , , move, updates] = mocks.appendMove.mock.calls[0];
+    expect(move.fenBefore).toBe(START_FEN);
+    expect(updates.whiteTimeRemainingMs).toBe(62_000n);
+    expect(updates.blackTimeRemainingMs).toBe(60_000n);
+  });
+
+  it("starts the clock after the opening move without charging White time or increment", async () => {
+    mocks.findGame.mockResolvedValue({
+      id: 41,
+      currentFen: START_FEN,
       status: "WAITING",
       activeColor: null,
       pendingUndoParticipantId: null,
@@ -184,10 +206,14 @@ describe("MoveService.playMove", () => {
 
     await MoveService.playMove(41, 7, { from: "e2", to: "e4" });
 
-    const [, , , , move, updates] = mocks.appendMove.mock.calls[0];
-    expect(move.fenBefore).toBe(START_FEN);
-    expect(updates.whiteTimeRemainingMs).toBe(62_000n);
-    expect(updates.blackTimeRemainingMs).toBe(60_000n);
+    const [, , , , , updates] = mocks.appendMove.mock.calls[0];
+    expect(updates).toMatchObject({
+      status: "IN_PROGRESS",
+      activeColor: "BLACK",
+      whiteTimeRemainingMs: 60_000n,
+      blackTimeRemainingMs: 60_000n,
+    });
+    expect(updates.clockStartedAt).toBeInstanceOf(Temporal.Instant);
   });
 
   it("finishes the game instead of accepting a move after the clock expires", async () => {

@@ -27,7 +27,8 @@ export const ChallengeController = {
       (body.colorPreference !== undefined &&
         body.colorPreference !== "WHITE" &&
         body.colorPreference !== "BLACK" &&
-        body.colorPreference !== "RANDOM")
+        body.colorPreference !== "RANDOM") ||
+      (body.isRated !== undefined && typeof body.isRated !== "boolean")
     ) {
       response.status(422).json({ success: false, message: "Données de défi invalides." });
       return;
@@ -41,6 +42,7 @@ export const ChallengeController = {
       typeof body.colorPreference === "string"
         ? body.colorPreference as "WHITE" | "BLACK" | "RANDOM"
         : "RANDOM",
+      typeof body.isRated === "boolean" ? body.isRated : false,
     )));
   }) satisfies RequestHandler,
 

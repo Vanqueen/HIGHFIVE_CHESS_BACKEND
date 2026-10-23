@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { GameController } from "../controller/game.controller";
 import { GameAnalysisController } from "../controller/game-analysis.controller";
-import { authenticate } from "../middlewares/auth.middleware";
+import { authenticate, authenticateOptional } from "../middlewares/auth.middleware";
 
 const gameRouter = Router();
 
@@ -16,6 +16,7 @@ gameRouter.get("/guest/:gameId/moves", GameController.getGuestMoves);
 gameRouter.get("/guest/:gameId/messages", GameController.getGuestMessages);
 gameRouter.get("/guest/:gameId/notifications", GameController.getGuestNotifications);
 gameRouter.post("/guest/:gameId/messages", GameController.sendGuestMessage);
+gameRouter.post("/matchmaking", authenticateOptional, GameController.createMatchmakingGame);
 gameRouter.use(authenticate);
 gameRouter.post("/", GameController.createGame);
 gameRouter.get("/me", GameController.getGamesForCurrentUser);

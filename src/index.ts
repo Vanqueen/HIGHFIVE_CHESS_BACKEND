@@ -72,7 +72,7 @@ async function startServer() {
   });
   app.use("/api/auth", authRouter);
   app.use("/api/users", usersRouter);
-  app.use("/api", socialRouter);
+  app.use("/api/social", socialRouter);
   app.use("/api/conversations", conversationsRouter);
   app.use("/api/reports", reportsRouter);
   app.use("/api/games", gameRouter);

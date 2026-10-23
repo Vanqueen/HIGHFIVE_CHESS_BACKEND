@@ -17,7 +17,11 @@ export const InvitationLinkController = {
       !Number.isSafeInteger(body.initialTimeSeconds) ||
       (body.incrementSeconds !== undefined &&
         (typeof body.incrementSeconds !== "number" ||
-          !Number.isSafeInteger(body.incrementSeconds)))
+          !Number.isSafeInteger(body.incrementSeconds))) ||
+      (body.colorPreference !== undefined &&
+        body.colorPreference !== "WHITE" &&
+        body.colorPreference !== "BLACK" &&
+        body.colorPreference !== "RANDOM")
     ) {
       response.status(422).json({ success: false, message: "Contrôle du temps invalide." });
       return;
@@ -26,6 +30,9 @@ export const InvitationLinkController = {
       await AnonymousGameService.createGame(
         body.initialTimeSeconds,
         typeof body.incrementSeconds === "number" ? body.incrementSeconds : 0,
+        typeof body.colorPreference === "string"
+          ? body.colorPreference as "WHITE" | "BLACK" | "RANDOM"
+          : "RANDOM",
       ),
     ));
   }) satisfies RequestHandler,

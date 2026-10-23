@@ -4,14 +4,13 @@ import { authenticate } from "../middlewares/auth.middleware";
 
 const socialRouter = Router();
 
-socialRouter.use(authenticate);
-socialRouter.get("/friendships/me", SocialController.getFriendships);
-socialRouter.post("/friendships/:userId", SocialController.requestFriendship);
-socialRouter.post("/friendships/:friendshipId/accept", SocialController.acceptFriendship);
-socialRouter.post("/friendships/:friendshipId/reject", SocialController.rejectFriendship);
-socialRouter.delete("/friendships/:friendshipId", SocialController.removeFriendship);
-socialRouter.get("/blocked-users/me", SocialController.getBlockedUsers);
-socialRouter.post("/blocked-users/:userId", SocialController.blockUser);
-socialRouter.delete("/blocked-users/:userId", SocialController.unblockUser);
+socialRouter.get("/friendships/me", authenticate, SocialController.getFriendships);
+socialRouter.post("/friendships/:userId", authenticate, SocialController.requestFriendship);
+socialRouter.post("/friendships/:friendshipId/accept", authenticate, SocialController.acceptFriendship);
+socialRouter.post("/friendships/:friendshipId/reject", authenticate, SocialController.rejectFriendship);
+socialRouter.delete("/friendships/:friendshipId", authenticate, SocialController.removeFriendship);
+socialRouter.get("/blocked-users/me", authenticate, SocialController.getBlockedUsers);
+socialRouter.post("/blocked-users/:userId", authenticate, SocialController.blockUser);
+socialRouter.delete("/blocked-users/:userId", authenticate, SocialController.unblockUser);
 
 export default socialRouter;

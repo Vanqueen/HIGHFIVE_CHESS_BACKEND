@@ -10,6 +10,7 @@ import { GAME_ACTIONS } from "../events/game.events";
 import { publishGameBroadcast } from "../events/game.broadcast";
 import { AnonymousGameService } from "../service/anonymousGameService";
 import { NotificationService } from "../service/notificationService";
+import { MatchmakingService } from "../service/matchmakingService";
 import HttpError from "../service/errorService";
 import { verifyGuestGameToken } from "../utils/guestGameToken";
 import {
@@ -66,6 +67,31 @@ export const GameController = {
     response.status(201).json(await GameService.createGame(
       body.gameData as CreateGameData,
       body.participants as CreateGameParticipantData[],
+    ));
+  }) satisfies RequestHandler,
+
+  createMatchmakingGame: (async (request, response) => {
+    const body = readBody(request);
+    if (
+      typeof body.initialTimeSeconds !== "number" ||
+      !Number.isSafeInteger(body.initialTimeSeconds) ||
+      (body.incrementSeconds !== undefined &&
+        (typeof body.incrementSeconds !== "number" ||
+          !Number.isSafeInteger(body.incrementSeconds)))
+    ) {
+      response.status(422).json({
+        success: false,
+        message: "Contrôle du temps invalide.",
+      });
+      return;
+    }
+    const user = response.locals.user as { id: number } | undefined;
+    response.status(201).json(serializeBigInts(
+      await MatchmakingService.createQueueGame(
+        body.initialTimeSeconds,
+        typeof body.incrementSeconds === "number" ? body.incrementSeconds : 0,
+        user?.id ?? null,
+      ),
     ));
   }) satisfies RequestHandler,
 
@@ -131,8 +157,7 @@ export const GameController = {
       response.status(201).json(serializedResult);
       return;
     }
-    const state = await GameService.getGameForUser(gameId, user.id);
-    const serializedResult = serializeBigInts({ game: state.game, move: result.move });
+    const serializedResult = serializeBigInts({ game: result.game, move: result.move });
     publishGameBroadcast({ type: "move-played", gameId, result: serializedResult });
     response.status(201).json(serializedResult);
   }) satisfies RequestHandler,
@@ -174,8 +199,7 @@ export const GameController = {
       return;
     }
 
-    const state = await GameService.getGameForGuest(gameId, participantId);
-    const serializedResult = serializeBigInts({ game: state.game, move: result.move });
+    const serializedResult = serializeBigInts({ game: result.game, move: result.move });
     publishGameBroadcast({ type: "move-played", gameId, result: serializedResult });
     response.status(201).json(serializedResult);
   }) satisfies RequestHandler,

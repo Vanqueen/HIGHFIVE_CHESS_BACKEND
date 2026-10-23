@@ -1,5 +1,6 @@
 export const GAME_EVENTS = {
   STATE: "game-state",
+  READY: "game-ready",
   UPDATED: "game-updated",
   TIMER_UPDATE: "timer-update",
   OFFER_DRAW: "offer-draw",
