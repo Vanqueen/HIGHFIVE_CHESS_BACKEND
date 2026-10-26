@@ -30,6 +30,7 @@ import {
 import { digestMatches, resetDigest } from "../utils/hash.util";
 import { sendEmailChangeCode } from "./emailService";
 import { epochMilliseconds } from "../utils/temporalDate.ts";
+import { RatingService } from "./ratingService";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_CHANGE_TTL_MS = 10 * 60 * 1000;
@@ -94,7 +95,13 @@ export class UserService {
       if (!user || user.accountStatus !== "ACTIVE" || user.deletedAt !== null) {
         throw new HttpError("Joueur introuvable.", 404, false);
       }
-      return { id: user.id, username: user.username, avatarUrl: user.avatarUrl };
+      const ratings = await RatingService.getForUser(user.id);
+      return {
+        id: user.id,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+        overallRating: ratings.overallRating,
+      };
     } catch (error) {
       rethrowServiceError(error, "Erreur lors de la récupération du profil public :");
     }
