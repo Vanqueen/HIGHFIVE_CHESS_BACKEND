@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   findUserByEmail: vi.fn(),
   findUserByUsername: vi.fn(),
   findUsers: vi.fn(),
+  getRatings: vi.fn(),
   searchActiveUsers: vi.fn(),
   restoreDeletedAccount: vi.fn(),
   savePendingEmailChange: vi.fn(),
@@ -36,6 +37,10 @@ vi.mock("../repository/user.repository", () => ({
   savePendingEmailChange: mocks.savePendingEmailChange,
   updateAvatar: mocks.updateAvatar,
   updateUsername: mocks.updateUsername,
+}));
+
+vi.mock("./ratingService", () => ({
+  RatingService: { getForUser: mocks.getRatings },
 }));
 
 vi.mock("../repository/account.repository", () => ({
@@ -156,11 +161,13 @@ describe("UserService account changes", () => {
 
   it("returns only safe public profile fields for active users", async () => {
     mocks.findUser.mockResolvedValue(makeUser());
+    mocks.getRatings.mockResolvedValue({ overallRating: 1510 });
 
     await expect(UserService.getPublicProfile(7)).resolves.toEqual({
       id: 7,
       username: "joueur",
       avatarUrl: null,
+      overallRating: 1510,
     });
   });
 
