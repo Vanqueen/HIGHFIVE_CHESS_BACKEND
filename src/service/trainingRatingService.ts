@@ -2,8 +2,12 @@ import { db } from "../prisma/db.ts";
 import HttpError from "./errorService";
 
 const SPECIAL_COURSE_UNLOCK_RATING = 800;
+const INTERMEDIATE_LEVEL_UNLOCK_RATING = 500;
+const ADVANCED_LEVEL_UNLOCK_RATING = 800;
 const FINAL_BEGINNER_LESSON_UNLOCK_RATING = 220;
 const RATING_LOCKED_BEGINNER_LESSONS = new Set(["queen", "king", "check"]);
+const INTERMEDIATE_LESSONS = new Set(["intermediateTactics", "intermediateStrategy", "intermediateEndgames"]);
+const ADVANCED_LESSONS = new Set(["advancedCalculation", "advancedPin", "advancedEndgames"]);
 
 // Beginner curriculum: rewards rise with lesson complexity and total 500 points.
 // The first three intermediate lessons will each award 100 points, so 800
@@ -19,6 +23,9 @@ const LESSON_RATING_POINTS: Record<string, number> = {
   intermediateTactics: 100,
   intermediateStrategy: 100,
   intermediateEndgames: 100,
+  advancedCalculation: 150,
+  advancedPin: 175,
+  advancedEndgames: 200,
 };
 
 // Only lessons with server-validated interactive steps can currently award points.
@@ -30,6 +37,12 @@ const AVAILABLE_LESSONS: Record<string, { difficultyRating: number; requiredMove
   queen: { difficultyRating: 850, requiredMoves: ["d1d4", "d4h8"] },
   king: { difficultyRating: 900, requiredMoves: ["e1e2", "e2d3"] },
   check: { difficultyRating: 1000, requiredMoves: ["e1f1", "h1g1"] },
+  intermediateTactics: { difficultyRating: 1200, requiredMoves: ["f2e4", "e4f6"] },
+  intermediateStrategy: { difficultyRating: 1250, requiredMoves: ["e5e6", "e6e7", "e7e8"] },
+  intermediateEndgames: { difficultyRating: 1300, requiredMoves: ["e2e3", "e3d4"] },
+  advancedCalculation: { difficultyRating: 1500, requiredMoves: ["h5f7", "f7e8"] },
+  advancedPin: { difficultyRating: 1550, requiredMoves: ["c4b5", "b5c6"] },
+  advancedEndgames: { difficultyRating: 1600, requiredMoves: ["a1a4", "a6a7"] },
 };
 
 function ratingForCompletedLessons(lessonIds: string[]) {
@@ -111,6 +124,12 @@ export class TrainingRatingService {
 
       if (RATING_LOCKED_BEGINNER_LESSONS.has(lessonId) && ratingBefore < FINAL_BEGINNER_LESSON_UNLOCK_RATING) {
         throw new HttpError("Atteins 220 Elo d’entraînement pour débloquer cette leçon.", 403, false);
+      }
+      if (INTERMEDIATE_LESSONS.has(lessonId) && ratingBefore < INTERMEDIATE_LEVEL_UNLOCK_RATING) {
+        throw new HttpError("Termine le parcours débutant pour débloquer les leçons intermédiaires.", 403, false);
+      }
+      if (ADVANCED_LESSONS.has(lessonId) && ratingBefore < ADVANCED_LEVEL_UNLOCK_RATING) {
+        throw new HttpError("Atteins 800 Elo d’entraînement pour débloquer le parcours avancé.", 403, false);
       }
 
       const ratingAfter = ratingBefore + ratingChange;
