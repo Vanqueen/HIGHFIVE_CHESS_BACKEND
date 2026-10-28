@@ -4,6 +4,7 @@ import { UserService } from "../service/userService";
 import { StatisticsService } from "../service/statisticsService";
 import { getUserAchievements } from "../service/achievementService";
 import { RatingService } from "../service/ratingService";
+import { TrainingRatingService } from "../service/trainingRatingService";
 import {
   readBody,
   readParamId,
@@ -48,9 +49,35 @@ export const UserController = {
     response.status(200).json(await StatisticsService.getForUser(user.id));
   }) satisfies RequestHandler,
 
+  getMe: (async (_request, response) => {
+    const user = requireCurrentUser(response);
+    const { data } = await UserService.getUserById(user.id);
+    response.status(200).json({ user: data });
+  }) satisfies RequestHandler,
+
   getMyRatings: (async (_request, response) => {
     const user = requireCurrentUser(response);
     response.status(200).json(await RatingService.getForUser(user.id));
+  }) satisfies RequestHandler,
+
+  getMyTrainingRating: (async (_request, response) => {
+    const user = requireCurrentUser(response);
+    response.status(200).json(await TrainingRatingService.getForUser(user.id));
+  }) satisfies RequestHandler,
+
+  completeTrainingLesson: (async (request, response) => {
+    const user = requireCurrentUser(response);
+    const lessonId = request.params.lessonId;
+    if (typeof lessonId !== "string" || !/^[a-z][a-z0-9-]{0,39}$/.test(lessonId)) {
+      response.status(422).json({ success: false, message: "Identifiant de leçon invalide." });
+      return;
+    }
+    const moves = readBody(request).moves;
+    if (!Array.isArray(moves) || !moves.every((move) => typeof move === "string")) {
+      response.status(422).json({ success: false, message: "La progression de la leçon est invalide." });
+      return;
+    }
+    response.status(200).json(await TrainingRatingService.completeLesson(user.id, lessonId, moves));
   }) satisfies RequestHandler,
 
   getMyAchievements: (async (_request, response) => {

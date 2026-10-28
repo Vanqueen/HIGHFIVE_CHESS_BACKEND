@@ -34,9 +34,9 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'3720491cd100f4ee5e3944350c68a37d0138d3fccf26a13253cfd69c3273082d'>;
+  StorageHashBase<'2bc13d4e42dc713a948d2a1fb8b00b9110c7718cc22bb659cb6a308c579b5ee7'>;
 export type ExecutionHash =
-  ExecutionHashBase<'d8c34a0b049a76c1f6f5a055b8d3ffcd114c2ca9483e661f21e49c9bf679b51b'>;
+  ExecutionHashBase<'d14556e875d4cbe498538f8928dd07a87d0b8371796ca84cfa3d2d2429b55b18'>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -593,6 +593,23 @@ export type FieldOutputTypes = {
       readonly tournamentId: CodecTypes['pg/int4@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
+    readonly TrainingLessonCompletion: {
+      readonly completedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly difficultyRating: CodecTypes['pg/int4@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly lessonId: CodecTypes['pg/text@1']['output'];
+      readonly ratingAfter: CodecTypes['pg/int4@1']['output'];
+      readonly ratingBefore: CodecTypes['pg/int4@1']['output'];
+      readonly ratingChange: CodecTypes['pg/int4@1']['output'];
+      readonly userId: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly TrainingRating: {
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly lessonsCompleted: CodecTypes['pg/int4@1']['output'];
+      readonly rating: CodecTypes['pg/int4@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly userId: CodecTypes['pg/int4@1']['output'];
+    };
     readonly User: {
       readonly accountStatus: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
       readonly avatarPublicId: CodecTypes['pg/text@1']['output'] | null;
@@ -976,6 +993,23 @@ export type FieldInputTypes = {
       readonly status: 'PENDING' | 'IN_PROGRESS' | 'FINISHED' | 'CANCELLED';
       readonly tournamentId: CodecTypes['pg/int4@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+    };
+    readonly TrainingLessonCompletion: {
+      readonly completedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly difficultyRating: CodecTypes['pg/int4@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly lessonId: CodecTypes['pg/text@1']['input'];
+      readonly ratingAfter: CodecTypes['pg/int4@1']['input'];
+      readonly ratingBefore: CodecTypes['pg/int4@1']['input'];
+      readonly ratingChange: CodecTypes['pg/int4@1']['input'];
+      readonly userId: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly TrainingRating: {
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly lessonsCompleted: CodecTypes['pg/int4@1']['input'];
+      readonly rating: CodecTypes['pg/int4@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly userId: CodecTypes['pg/int4@1']['input'];
     };
     readonly User: {
       readonly accountStatus: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
@@ -1361,6 +1395,23 @@ export type StorageColumnTypes = {
       readonly tournamentId: CodecTypes['pg/int4@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
+    readonly TrainingLessonCompletion: {
+      readonly completedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly difficultyRating: CodecTypes['pg/int4@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly lessonId: CodecTypes['pg/text@1']['output'];
+      readonly ratingAfter: CodecTypes['pg/int4@1']['output'];
+      readonly ratingBefore: CodecTypes['pg/int4@1']['output'];
+      readonly ratingChange: CodecTypes['pg/int4@1']['output'];
+      readonly userId: CodecTypes['pg/int4@1']['output'];
+    };
+    readonly TrainingRating: {
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly lessonsCompleted: CodecTypes['pg/int4@1']['output'];
+      readonly rating: CodecTypes['pg/int4@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly userId: CodecTypes['pg/int4@1']['output'];
+    };
     readonly User: {
       readonly accountStatus: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
       readonly avatarPublicId: CodecTypes['pg/text@1']['output'] | null;
@@ -1744,6 +1795,23 @@ export type StorageColumnInputTypes = {
       readonly status: 'PENDING' | 'IN_PROGRESS' | 'FINISHED' | 'CANCELLED';
       readonly tournamentId: CodecTypes['pg/int4@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+    };
+    readonly TrainingLessonCompletion: {
+      readonly completedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly difficultyRating: CodecTypes['pg/int4@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly lessonId: CodecTypes['pg/text@1']['input'];
+      readonly ratingAfter: CodecTypes['pg/int4@1']['input'];
+      readonly ratingBefore: CodecTypes['pg/int4@1']['input'];
+      readonly ratingChange: CodecTypes['pg/int4@1']['input'];
+      readonly userId: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly TrainingRating: {
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly lessonsCompleted: CodecTypes['pg/int4@1']['input'];
+      readonly rating: CodecTypes['pg/int4@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly userId: CodecTypes['pg/int4@1']['input'];
     };
     readonly User: {
       readonly accountStatus: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
@@ -2241,6 +2309,27 @@ export namespace Models {
     tournament: public_Tournament;
     readonly [RelationKeys]?: 'games' | 'tournament';
   };
+  export type public_TrainingLessonCompletion = {
+    completedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    difficultyRating: CodecTypes['pg/int4@1']['output'];
+    id: CodecTypes['pg/int4@1']['output'];
+    lessonId: CodecTypes['pg/text@1']['output'];
+    ratingAfter: CodecTypes['pg/int4@1']['output'];
+    ratingBefore: CodecTypes['pg/int4@1']['output'];
+    ratingChange: CodecTypes['pg/int4@1']['output'];
+    userId: CodecTypes['pg/int4@1']['output'];
+    user: public_User;
+    readonly [RelationKeys]?: 'user';
+  };
+  export type public_TrainingRating = {
+    createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    lessonsCompleted: CodecTypes['pg/int4@1']['output'];
+    rating: CodecTypes['pg/int4@1']['output'];
+    updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    userId: CodecTypes['pg/int4@1']['output'];
+    user: public_User;
+    readonly [RelationKeys]?: 'user';
+  };
   export type public_User = {
     accountStatus: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
     avatarPublicId: CodecTypes['pg/text@1']['output'] | null;
@@ -2283,6 +2372,8 @@ export namespace Models {
     statistics: public_UserStatistics | null;
     tournamentParticipants: public_TournamentParticipant[];
     tournamentsOrganized: public_Tournament[];
+    trainingCompletions: public_TrainingLessonCompletion[];
+    trainingRating: public_TrainingRating | null;
     readonly [RelationKeys]?:
       | 'achievements'
       | 'blockedByUsers'
@@ -2306,7 +2397,9 @@ export namespace Models {
       | 'sessions'
       | 'statistics'
       | 'tournamentParticipants'
-      | 'tournamentsOrganized';
+      | 'tournamentsOrganized'
+      | 'trainingCompletions'
+      | 'trainingRating';
   };
   export type public_UserAchievement = {
     achievementId: CodecTypes['pg/int4@1']['output'];
@@ -2358,6 +2451,8 @@ export declare const models: {
     Tournament: Models.public_Tournament;
     TournamentParticipant: Models.public_TournamentParticipant;
     TournamentRound: Models.public_TournamentRound;
+    TrainingLessonCompletion: Models.public_TrainingLessonCompletion;
+    TrainingRating: Models.public_TrainingRating;
     User: Models.public_User;
     UserAchievement: Models.public_UserAchievement;
     UserStatistics: Models.public_UserStatistics;
@@ -5016,6 +5111,140 @@ type ContractBase = Omit<
                 },
               ];
             };
+            readonly TrainingLessonCompletion: {
+              columns: {
+                readonly completedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly difficultyRating: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly id: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'autoincrement()';
+                  };
+                };
+                readonly lessonId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly ratingAfter: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly ratingBefore: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly ratingChange: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly userId: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['userId', 'lessonId'] }];
+              indexes: readonly [
+                {
+                  readonly name: 'TrainingLessonCompletion_userId_completedAt_idx_97946ef5';
+                  readonly prefix: 'TrainingLessonCompletion_userId_completedAt_idx';
+                  readonly columns: readonly ['userId', 'completedAt'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'TrainingLessonCompletion_userId_idx_a489d58a';
+                  readonly prefix: 'TrainingLessonCompletion_userId_idx';
+                  readonly columns: readonly ['userId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'TrainingLessonCompletion';
+                    readonly columns: readonly ['userId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'User';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+            readonly TrainingRating: {
+              columns: {
+                readonly createdAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly lessonsCompleted: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/int4@1', 0>;
+                  };
+                };
+                readonly rating: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/int4@1', 0>;
+                  };
+                };
+                readonly updatedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                };
+                readonly userId: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['userId'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'TrainingRating';
+                    readonly columns: readonly ['userId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'User';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
             readonly User: {
               columns: {
                 readonly accountStatus: {
@@ -5565,6 +5794,14 @@ type ContractBase = Omit<
     readonly TournamentRound: {
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'TournamentRound';
+    };
+    readonly TrainingLessonCompletion: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'TrainingLessonCompletion';
+    };
+    readonly TrainingRating: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'TrainingRating';
     };
     readonly User: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
     readonly UserAchievement: {
@@ -7983,6 +8220,122 @@ type ContractBase = Omit<
               };
             };
           };
+          readonly TrainingLessonCompletion: {
+            readonly fields: {
+              readonly completedAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+              readonly difficultyRating: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly lessonId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly ratingAfter: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly ratingBefore: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly ratingChange: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+            };
+            readonly relations: {
+              readonly user: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['userId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'TrainingLessonCompletion';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly completedAt: { readonly column: 'completedAt' };
+                readonly difficultyRating: { readonly column: 'difficultyRating' };
+                readonly id: { readonly column: 'id' };
+                readonly lessonId: { readonly column: 'lessonId' };
+                readonly ratingAfter: { readonly column: 'ratingAfter' };
+                readonly ratingBefore: { readonly column: 'ratingBefore' };
+                readonly ratingChange: { readonly column: 'ratingChange' };
+                readonly userId: { readonly column: 'userId' };
+              };
+            };
+          };
+          readonly TrainingRating: {
+            readonly fields: {
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+              readonly lessonsCompleted: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly rating: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly updatedAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+            };
+            readonly relations: {
+              readonly user: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['userId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'TrainingRating';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly createdAt: { readonly column: 'createdAt' };
+                readonly lessonsCompleted: { readonly column: 'lessonsCompleted' };
+                readonly rating: { readonly column: 'rating' };
+                readonly updatedAt: { readonly column: 'updatedAt' };
+                readonly userId: { readonly column: 'userId' };
+              };
+            };
+          };
           readonly User: {
             readonly fields: {
               readonly accountStatus: {
@@ -8329,6 +8682,29 @@ type ContractBase = Omit<
                 readonly on: {
                   readonly localFields: readonly ['id'];
                   readonly targetFields: readonly ['organizerId'];
+                };
+              };
+              readonly trainingCompletions: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'TrainingLessonCompletion';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['userId'];
+                };
+              };
+              readonly trainingRating: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'TrainingRating';
+                };
+                readonly cardinality: '1:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['userId'];
                 };
               };
             };
@@ -8905,6 +9281,15 @@ type ContractBase = Omit<
             readonly column: 'updatedAt';
             readonly namespace: 'public';
             readonly table: 'TournamentRound';
+          };
+        },
+        {
+          readonly onCreate: { readonly id: 'instantNow'; readonly kind: 'generator' };
+          readonly onUpdate: { readonly id: 'instantNow'; readonly kind: 'generator' };
+          readonly ref: {
+            readonly column: 'updatedAt';
+            readonly namespace: 'public';
+            readonly table: 'TrainingRating';
           };
         },
         {
