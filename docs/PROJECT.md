@@ -4,7 +4,7 @@
 
 ## Produit
 - Nom : le `README.md` racine le nomme simplement « server » ; `package.json` le nomme `highfive_chess_backend` ; une variable d'environnement (`APP_NAME`) le nomme « HIGHFIVE_CHESS » ; `AUTH_COOKIE_NAME` et `EMAIL_FROM` utilisent « highfive_tournament » / « HIGHFIVE Tournament ». Voir incohérence en « À confirmer » (et celle déjà notée côté frontend : titre HTML « CHESSARENA »).
-- Objectif principal : API backend du jeu d'échecs en ligne consommé par `HIGHFIVE_CHESS_CLIENT` — gestion des comptes, des parties (classées, amicales, contre invités), des défis, des tournois, du classement (rating), de la messagerie, des notifications, des signalements/modération et de l'analyse de parties (moteur Stockfish).
+- Objectif principal : API backend du jeu d'échecs en ligne consommé par `HIGHFIVE_CHESS_CLIENT` — gestion des comptes, des parties (classées, amicales, contre invités), des défis, des tournois, du classement (rating), de l'Elo d'entraînement, de la messagerie, des notifications, des signalements/modération et de l'analyse de parties (moteur Stockfish).
 - Utilisateurs : trois rôles identifiés dans le code (`src/middlewares/auth.middleware.ts`) : `USER`, `ORGANIZER`, `ADMIN`.
 - Fonctionnalités principales (déduites de `src/routes/` et de `docs/*.md` déjà présents dans ce dossier) : authentification et mots de passe, comptes/administration, parties et coups, temps réel (WebSocket), défis directs, liens d'invitation, amitiés/blocages/conversations, signalements et succès, analyse de parties via Stockfish, tournois, maintenance des données de coups. Le détail métier de chaque domaine est déjà documenté dans les fichiers voisins de ce dossier (`authentification.md`, `comptes.md`, `parties-et-coups.md`, `temps-reel.md`, `defis.md`, `liens-invitation.md`, `social-et-blocages.md`, `moderation-analyse-succes.md`, `tournois.md`, `maintenance-donnees.md`), ce fichier ne les duplique pas.
 
@@ -26,7 +26,7 @@
 - Point d'entrée Prisma Composer (déploiement/dev managés) : `module.ts` (provisionne la base Postgres puis l'app) et `service.ts` (lie l'app Express au build Composer, `dist/server.mjs`).
 - Dossier des routes : `src/routes/` (une route Express par domaine : `auth`, `game`, `challenges`, `invitation-links`, `tournaments`, `users`, `social`, `conversations`, `reports`).
 - Dossier des contrôleurs : `src/controller/` (validation/forme des requêtes HTTP, un contrôleur par domaine + `controller.utils.ts`).
-- Dossier des services : `src/service/` (logique métier : jeu, défis, tournois, rating, chat, notifications, réinitialisation de mot de passe, email, modération, achievements, analyse Stockfish, présence utilisateur, workers planifiés).
+- Dossier des services : `src/service/` (logique métier : jeu, défis, tournois, rating, Elo d'entraînement, chat, notifications, réinitialisation de mot de passe, email, modération, achievements, analyse Stockfish, présence utilisateur, workers planifiés).
 - Dossier des accès aux données : `src/repository/` (une couche repository par modèle Prisma : `user`, `game`, `move`, `tournament`, `rating`, `friendship`, `conversation`, `notification`, `report`, `achievement`, etc.).
 - Dossier WebSocket : `src/websocket/` (`game.gateway.ts` pour la connexion/les événements de partie, `socket-presence.registry.ts` pour la présence en ligne) + `src/events/` (définitions d'événements : jeu, chat, matchmaking, notifications, messages).
 - Dossier des middlewares : `src/middlewares/` (authentification, limitation de débit sur l'auth, gestion centralisée des erreurs).
@@ -35,6 +35,13 @@
 - Dossier utilitaires : `src/utils/` (hachage mots de passe/tokens, JWT, dates (`temporal-polyfill`), Cloudinary, email, catégories de rating, couleur des pièces).
 - Dossier des tests : pas de dossier séparé ; les tests sont colocalisés avec le code qu'ils couvrent (convention `*.test.ts` / `*.integration.test.ts`).
 - Migrations : `migrations/app/<horodatage>_<nom>` (historique des migrations Prisma Composer) + `migrations/snapshots/` (snapshots de schéma référencés par hash).
+
+## Elo d'entraînement
+- L'Elo d'entraînement est distinct du rating des parties classées. `TrainingRating` conserve le score courant, et `TrainingLessonCompletion` garde le détail de chaque leçon validée afin qu'une même leçon ne rapporte ses points qu'une seule fois par compte.
+- Les routes authentifiées `GET /api/users/me/training-rating` et `POST /api/users/me/training-rating/lessons/:lessonId/complete` exposent cette progression. Le serveur décide quelles leçons sont disponibles, leur difficulté et la séquence de coups requise; le navigateur ne choisit ni le score ni le gain.
+- Le score initial est 0 et le gain est calculé avec la formule Elo côté serveur (K = 32). À l'heure actuelle, seule la leçon `pawn` est activée dans `src/service/trainingRatingService.ts`; ajouter un cours jouable exige de l'enregistrer côté serveur.
+- Le backend renvoie également l'état de déblocage des cours spéciaux, avec un premier palier à 30 points d'entraînement. Les nouveaux cours devront vérifier ce palier côté service avant d'accorder l'accès; le client ne fait qu'afficher l'état.
+- Le schéma et le plan de migration sont générés, mais la migration doit être déployée sur la base cible avant que les routes soient utilisables en production.
 
 ## Commandes validées
 - Installation : non exécutée pendant cette analyse ; `package-lock.json` présent, donc `npm install`/`npm ci` est l'outil attendu (à confirmer en l'exécutant).

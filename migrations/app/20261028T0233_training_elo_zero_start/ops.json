@@ -1,0 +1,44 @@
+[
+  {
+    "id": "setDefault.TrainingRating.rating",
+    "label": "Set default on \"TrainingRating\".\"rating\"",
+    "operationClass": "widening",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "rating",
+        "table": "TrainingRating"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"rating\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "TrainingRating",
+          "rating"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "set default on \"rating\"",
+        "sql": "ALTER TABLE \"public\".\"TrainingRating\" ALTER COLUMN \"rating\" SET DEFAULT 0"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"rating\" has a default",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"column_default\" IS NOT NULL)) AS \"result\"",
+        "params": [
+          "public",
+          "TrainingRating",
+          "rating"
+        ]
+      }
+    ]
+  }
+]

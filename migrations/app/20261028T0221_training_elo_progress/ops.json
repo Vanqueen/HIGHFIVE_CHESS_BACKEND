@@ -1,0 +1,284 @@
+[
+  {
+    "id": "table.TrainingLessonCompletion",
+    "label": "Create table \"TrainingLessonCompletion\"",
+    "summary": "Creates table \"TrainingLessonCompletion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "TrainingLessonCompletion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"TrainingLessonCompletion\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainingLessonCompletion\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"TrainingLessonCompletion\"",
+        "sql": "CREATE TABLE \"public\".\"TrainingLessonCompletion\" (\n  \"completedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"difficultyRating\" int4 NOT NULL,\n  \"id\" SERIAL NOT NULL,\n  \"lessonId\" text NOT NULL,\n  \"ratingAfter\" int4 NOT NULL,\n  \"ratingBefore\" int4 NOT NULL,\n  \"ratingChange\" int4 NOT NULL,\n  \"userId\" int4 NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"TrainingLessonCompletion\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainingLessonCompletion\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.TrainingRating",
+    "label": "Create table \"TrainingRating\"",
+    "summary": "Creates table \"TrainingRating\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "TrainingRating"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"TrainingRating\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainingRating\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"TrainingRating\"",
+        "sql": "CREATE TABLE \"public\".\"TrainingRating\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"lessonsCompleted\" int4 DEFAULT 0 NOT NULL,\n  \"rating\" int4 DEFAULT 400 NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"userId\" int4 NOT NULL,\n  PRIMARY KEY (\"userId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"TrainingRating\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainingRating\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.TrainingLessonCompletion.TrainingLessonCompletion_userId_lessonId_key",
+    "label": "Add unique constraint on \"TrainingLessonCompletion\" (userId, lessonId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "TrainingLessonCompletion_userId_lessonId_key",
+        "table": "TrainingLessonCompletion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"TrainingLessonCompletion_userId_lessonId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TrainingLessonCompletion_userId_lessonId_key",
+          "public",
+          "\"public\".\"TrainingLessonCompletion\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"TrainingLessonCompletion_userId_lessonId_key\"",
+        "sql": "ALTER TABLE \"public\".\"TrainingLessonCompletion\" ADD CONSTRAINT \"TrainingLessonCompletion_userId_lessonId_key\" UNIQUE (\"userId\", \"lessonId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"TrainingLessonCompletion_userId_lessonId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TrainingLessonCompletion_userId_lessonId_key",
+          "public",
+          "\"public\".\"TrainingLessonCompletion\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.TrainingLessonCompletion.TrainingLessonCompletion_userId_completedAt_idx_97946ef5",
+    "label": "Create index \"TrainingLessonCompletion_userId_completedAt_idx_97946ef5\" on \"TrainingLessonCompletion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "TrainingLessonCompletion_userId_completedAt_idx_97946ef5",
+        "table": "TrainingLessonCompletion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"TrainingLessonCompletion_userId_completedAt_idx_97946ef5\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainingLessonCompletion_userId_completedAt_idx_97946ef5\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"TrainingLessonCompletion_userId_completedAt_idx_97946ef5\"",
+        "sql": "CREATE INDEX \"TrainingLessonCompletion_userId_completedAt_idx_97946ef5\" ON \"public\".\"TrainingLessonCompletion\" (\"userId\", \"completedAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"TrainingLessonCompletion_userId_completedAt_idx_97946ef5\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainingLessonCompletion_userId_completedAt_idx_97946ef5\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.TrainingLessonCompletion.TrainingLessonCompletion_userId_idx_a489d58a",
+    "label": "Create index \"TrainingLessonCompletion_userId_idx_a489d58a\" on \"TrainingLessonCompletion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "TrainingLessonCompletion_userId_idx_a489d58a",
+        "table": "TrainingLessonCompletion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"TrainingLessonCompletion_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainingLessonCompletion_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"TrainingLessonCompletion_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"TrainingLessonCompletion_userId_idx_a489d58a\" ON \"public\".\"TrainingLessonCompletion\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"TrainingLessonCompletion_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainingLessonCompletion_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.TrainingLessonCompletion.TrainingLessonCompletion_userId_fkey",
+    "label": "Add foreign key \"TrainingLessonCompletion_userId_fkey\" on \"TrainingLessonCompletion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "TrainingLessonCompletion_userId_fkey",
+        "table": "TrainingLessonCompletion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"TrainingLessonCompletion_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TrainingLessonCompletion_userId_fkey",
+          "public",
+          "\"public\".\"TrainingLessonCompletion\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"TrainingLessonCompletion_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"TrainingLessonCompletion\"\nADD CONSTRAINT \"TrainingLessonCompletion_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"User\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"TrainingLessonCompletion_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TrainingLessonCompletion_userId_fkey",
+          "public",
+          "\"public\".\"TrainingLessonCompletion\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.TrainingRating.TrainingRating_userId_fkey",
+    "label": "Add foreign key \"TrainingRating_userId_fkey\" on \"TrainingRating\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "TrainingRating_userId_fkey",
+        "table": "TrainingRating"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"TrainingRating_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TrainingRating_userId_fkey",
+          "public",
+          "\"public\".\"TrainingRating\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"TrainingRating_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"TrainingRating\"\nADD CONSTRAINT \"TrainingRating_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"User\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"TrainingRating_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TrainingRating_userId_fkey",
+          "public",
+          "\"public\".\"TrainingRating\""
+        ]
+      }
+    ]
+  }
+]

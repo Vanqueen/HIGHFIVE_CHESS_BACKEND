@@ -86,7 +86,8 @@
     "valibot": "^1.4.2"
   },
   "allowScripts": {
-    "argon2@0.45.1": true,
-    "esbuild@0.28.2": true
+    "argon2": true,
+    "esbuild": true,
+    "workerd": true
   }
 }
